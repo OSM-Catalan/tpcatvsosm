@@ -1,0 +1,6 @@
+[out:json][timeout:45];
+(
+  relation["route"="bus"]["ref"="86"](41.3,2.1,41.5,2.3);
+  way["route"="bus"]["ref"="86"](41.3,2.1,41.5,2.3);
+);
+out geom;

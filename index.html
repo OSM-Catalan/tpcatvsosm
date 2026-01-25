@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenStreetMap and ICGC Ortoimage Webapp</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+        }
+        #map {
+            width: 100%;
+            height: 100vh;
+        }
+        #controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        #controls select {
+            width: 200px;
+        }
+        #sidebar {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 300px;
+            height: 80vh;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            z-index: 1000;
+        }
+        #stops-list {
+            max-height: calc(80vh - 40px);
+            overflow-y: auto;
+        }
+        .stop-item {
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        .stop-item:hover {
+            background: #f5f5f5;
+        }
+        .stop-number-icon {
+            background: transparent;
+            border: none;
+        }
+        .stop-number {
+            background: yellow;
+            color: black;
+            border: 2px solid black;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <h3>Stops List</h3>
+        <div id="stops-list"></div>
+    </div>
+    <div id="map"></div>
+    <div id="controls">
+        <label for="layer-select">Base Layer:</label>
+        <select id="layer-select">
+            <option value="osm">OpenStreetMap</option>
+            <option value="icgc">ICGC Ortoimage</option>
+        </select>
+        <br>
+        <label for="stops-select">Stops Source:</label>
+        <select id="stops-select">
+            <option value="none">None</option>
+            <option value="osm">OSM Overpass</option>
+            <option value="gtfs">GTFS</option>
+            <option value="both">Both</option>
+        </select>
+        <br>
+        <button id="load-stops-btn">Load Stops</button>
+        <br>
+        <button id="calculate-differences-btn">Calculate Differences</button>
+        <br>
+        <button id="geolocate-btn">Geolocate Me</button>
+        <br>
+        <!-- Lines will be listed in sidebar -->
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="functions.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
