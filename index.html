@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OpenStreetMap and ICGC Ortoimage Webapp</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body, html {
             margin: 0;
@@ -15,34 +16,172 @@
             width: 100%;
             height: 100vh;
         }
-        #controls {
+        #controls-panel {
             position: absolute;
-            top: 10px;
+            top: 430px;
             right: 10px;
             z-index: 1000;
             background: white;
-            padding: 10px;
-            border-radius: 5px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border-radius: 15px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.2);
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            min-width: 300px;
+            transition: all 0.3s ease;
         }
-        #controls select {
-            width: 200px;
+        #controls-panel.minimized {
+            width: 40px;
+            height: 40px;
+            min-width: 40px;
+            padding: 0;
+            overflow: hidden;
+        }
+        #controls-panel label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 5px;
+            display: block;
+        }
+        #controls-panel select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            background: white;
+            font-size: 14px;
+            color: #495057;
+        }
+        #controls-panel select:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+        }
+        .controls-divider {
+            height: 1px;
+            background: #dee2e6;
+            margin: 5px 0;
+        }
+        #icon-sidebar {
+            position: absolute;
+            top: 600px;
+            right: 10px;
+            z-index: 999;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.2);
+            padding: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            max-width: 300px;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+        #icon-sidebar.minimized {
+            width: 40px;
+            height: 40px;
+            max-width: 40px;
+            padding: 0;
+            overflow: hidden;
+        }
+        .icon-btn {
+            width: 45px;
+            height: 45px;
+            border: none;
+            background: #f8f9fa;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: #495057;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        .icon-btn:hover {
+            background: #007bff;
+            color: white;
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(0,123,255,0.3);
+        }
+        .icon-btn:active {
+            transform: scale(0.95);
+        }
+        .icon-btn.active {
+            background: #007bff;
+            color: white;
+        }
+        .tooltip {
+            position: absolute;
+            bottom: 55px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .icon-btn:hover .tooltip {
+            opacity: 1;
         }
         #sidebar {
             position: absolute;
             top: 10px;
-            left: 10px;
+            right: 10px;
             width: 300px;
-            height: 80vh;
+            height: 400px;
             background: white;
-            padding: 10px;
-            border-radius: 5px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border-radius: 15px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.2);
+            padding: 15px;
             overflow-y: auto;
             z-index: 1000;
+            transition: all 0.3s ease;
+        }
+        #sidebar.minimized {
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            overflow: hidden;
+        }
+        .close-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 24px;
+            height: 24px;
+            border: none;
+            background: #dc3545;
+            color: white;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+            z-index: 1001;
+            transition: all 0.2s ease;
+        }
+        .close-btn:hover {
+            background: #c82333;
+            transform: scale(1.1);
+        }
+        .minimized .close-btn {
+            top: 8px;
+            right: 8px;
         }
         #stops-list {
-            max-height: calc(80vh - 40px);
+            max-height: 320px;
             overflow-y: auto;
         }
         .stop-item {
@@ -71,37 +210,88 @@
             font-weight: bold;
             box-shadow: 0 2px 4px rgba(0,0,0,0.3);
         }
+        .context-menu {
+            position: absolute;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 10000;
+            padding: 5px 0;
+            min-width: 150px;
+        }
+        .context-menu-item {
+            padding: 8px 15px;
+            cursor: pointer;
+            font-size: 12px;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            display: block;
+        }
+        .context-menu-item:hover {
+            background: #f0f0f0;
+        }
 
     </style>
 </head>
 <body>
     <div id="sidebar">
+        <button class="close-btn" onclick="toggleSidebar()" title="Toggle Sidebar">×</button>
         <h3>Stops List</h3>
         <div id="stops-list"></div>
     </div>
     <div id="map"></div>
-    <div id="controls">
-        <label for="layer-select">Base Layer:</label>
-        <select id="layer-select">
-            <option value="osm">OpenStreetMap</option>
-            <option value="icgc">ICGC Ortoimage</option>
-        </select>
-        <br>
-        <label for="stops-select">Stops Source:</label>
-        <select id="stops-select">
-            <option value="none">None</option>
-            <option value="osm">OSM Overpass</option>
-            <option value="gtfs">GTFS</option>
-            <option value="both">Both</option>
-        </select>
-        <br>
-        <button id="load-stops-btn">Load Stops</button>
-        <br>
-        <button id="calculate-differences-btn">Calculate Differences</button>
-        <br>
-        <button id="geolocate-btn">Geolocate Me</button>
-        <br>
-        <!-- Lines will be listed in sidebar -->
+    <div id="controls-panel">
+        <button class="close-btn" onclick="toggleControlsPanel()" title="Toggle Controls">×</button>
+        <div>
+            <label for="layer-select">Base Layer</label>
+            <select id="layer-select">
+                <option value="osm">OpenStreetMap</option>
+                <option value="icgc">ICGC Ortoimage</option>
+            </select>
+        </div>
+        
+        <div class="controls-divider"></div>
+        
+        <div>
+            <label for="stops-select">Stops Source</label>
+            <select id="stops-select">
+                <option value="none">None</option>
+                <option value="osm">OSM Overpass</option>
+                <option value="gtfs">GTFS</option>
+                <option value="both">Both</option>
+            </select>
+        </div>
+    </div>
+    
+    <div id="icon-sidebar">
+        <button class="close-btn" onclick="toggleIconSidebar()" title="Toggle Icon Sidebar">×</button>
+        <button id="load-stops-btn" class="icon-btn" title="Load stops from selector">
+            <i class="fas fa-map-marker-alt"></i>
+            <span class="tooltip">Load stops from selector</span>
+        </button>
+        <button id="calculate-differences-btn" class="icon-btn" title="Calculate Differences">
+            <i class="fas fa-calculator"></i>
+            <span class="tooltip">Calculate Differences</span>
+        </button>
+        <button id="clean-map-btn" class="icon-btn" title="Clean Map">
+            <i class="fas fa-eraser"></i>
+            <span class="tooltip">Clean Map</span>
+        </button>
+        <button id="reset-selection-btn" class="icon-btn" title="Reset Selection">
+            <i class="fas fa-undo"></i>
+            <span class="tooltip">Reset Selection</span>
+        </button>
+        <button id="process-shapes-btn" class="icon-btn" title="Process GTFS Shapes">
+            <i class="fas fa-draw-polygon"></i>
+            <span class="tooltip">Process GTFS Shapes</span>
+        </button>
+        <button id="geolocate-btn" class="icon-btn" title="Geolocate Me">
+            <i class="fas fa-crosshairs"></i>
+            <span class="tooltip">Geolocate Me</span>
+        </button>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
