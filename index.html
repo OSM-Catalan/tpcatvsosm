@@ -363,12 +363,31 @@
         <div class="controls-divider"></div>
         
         <div>
+            <label for="nominatim-search">Search Area (Nominatim)</label>
+            <div style="position: relative;">
+                <input type="text" id="nominatim-search" placeholder="Type city, address, or place..." autocomplete="off">
+                <div id="nominatim-results" class="search-results"></div>
+            </div>
+        </div>
+        
+        <div class="controls-divider"></div>
+        
+        <div>
             <label for="stops-select">Stops Source</label>
             <select id="stops-select">
                 <option value="none">None</option>
                 <option value="osm">OSM Overpass</option>
                 <option value="gtfs">GTFS</option>
                 <option value="both">Both</option>
+            </select>
+        </div>
+        
+        <div class="controls-divider"></div>
+        
+        <div>
+            <label for="gtfs-folder-select">GTFS Data Folder</label>
+            <select id="gtfs-folder-select">
+                <option value="">Select GTFS folder...</option>
             </select>
         </div>
     </div>

@@ -61,6 +61,9 @@ const layerSelect = document.getElementById('layer-select');
 const stopsSelect = document.getElementById('stops-select');
 const searchInput = document.getElementById('search-input');
 const searchResults = document.getElementById('search-results');
+const nominatimSearch = document.getElementById('nominatim-search');
+const nominatimResults = document.getElementById('nominatim-results');
+const gtfsFolderSelect = document.getElementById('gtfs-folder-select');
 const loadStopsBtn = document.getElementById('load-stops-btn');
 const calculateDifferencesBtn = document.getElementById('calculate-differences-btn');
 const cleanMapBtn = document.getElementById('clean-map-btn');
@@ -188,9 +191,72 @@ document.addEventListener('click', function(e) {
     if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
         searchResults.style.display = 'none';
     }
+    if (!nominatimSearch.contains(e.target) && !nominatimResults.contains(e.target)) {
+        nominatimResults.style.display = 'none';
+    }
+});
+
+// Nominatim search functionality
+let nominatimTimeout;
+nominatimSearch.addEventListener('input', function() {
+    clearTimeout(nominatimTimeout);
+    const query = this.value.trim();
+    
+    if (query.length < 2) {
+        nominatimResults.style.display = 'none';
+        return;
+    }
+    
+    // Debounce search
+    nominatimTimeout = setTimeout(() => {
+        performNominatimSearch(query);
+    }, 300);
 });
 
 // Initialize search data on page load
 document.addEventListener('DOMContentLoaded', function() {
     loadSearchData();
+    initializeGtfsFolderDropdown(); // Immediate initialization
+    loadGtfsFolders(); // Async validation
+});
+
+// Handle GTFS folder selection
+gtfsFolderSelect.addEventListener('change', function() {
+    const selectedFolder = this.value;
+    if (selectedFolder) {
+        console.log('Selected GTFS folder:', selectedFolder);
+        // Update global GTFS folder variable
+        window.currentGtfsFolder = selectedFolder;
+        
+        // Clear all existing data
+        searchData.routes = [];
+        searchData.stops = [];
+        routesData = [];
+        tripsData = [];
+        osmStopsData = [];
+        gtfsStopsData = [];
+        
+        // Clear map layers
+        if (osmStopsLayer) {
+            map.removeLayer(osmStopsLayer);
+        }
+        if (gtfsStopsLayer) {
+            map.removeLayer(gtfsStopsLayer);
+        }
+        if (routeLayer) {
+            map.removeLayer(routeLayer);
+        }
+        
+        // Reload all data from new folder
+        loadSearchData().then(() => {
+            return loadGtfsDataAndPopulateLines();
+        }).then(() => {
+            console.log('GTFS data reloaded from folder:', selectedFolder);
+            console.log('Loaded routes:', routesData.length);
+            console.log('Loaded search routes:', searchData.routes.length);
+        }).catch(error => {
+            console.error('Error reloading GTFS data:', error);
+            alert('Error loading data from selected folder. Please try again.');
+        });
+    }
 });

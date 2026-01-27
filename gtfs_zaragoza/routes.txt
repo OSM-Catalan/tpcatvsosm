@@ -1,0 +1,56 @@
+route_id,agency_id,route_short_name,route_long_name,route_desc,route_type,route_url,route_color,route_text_color
+1,1,C1,Plaza de Las Canteras - Complejo Funerario,,3,,91960B,FFFFFF
+4,1,C4,Plaza de Las Canteras - Puerto Venecia,,3,,8B4896,FFFFFF
+11,1,Ci1,Circular 1,,3,,ED6B17,FFFFFF
+12,1,Ci2,Circular 2,,3,,702283,FFFFFF
+13,1,Ci3,Circular 3,,3,,91007E,FFFFFF
+14,1,Ci4,Circular 4,,3,,354887,FFFFFF
+21,1,21,Barrio Jesús - Oliver - Miralbueno,,3,,978685,FFFFFF
+22,1,22,Las Fuentes - Bombarda,,3,,008A92,FFFFFF
+23,1,23,Parque Venecia - Siglo XXI,,3,,508A32,FFFFFF
+24,1,24,Las Fuentes - Valdefierro,,3,,354887,FFFFFF
+25,1,25,La Cartuja - Puerta del Carmen,,3,,EAA200,FFFFFF
+28,1,28,Coso - Montañana/Peñaflor,,3,,C58400,FFFFFF
+29,1,29,Camino de Las Torres - San Gregorio,,3,,F5C100,000000
+30,1,30,Las Fuentes - Plaza Aragón,,3,,00B7D4,FFFFFF
+31,1,31,Puerto Venecia - Aljafería,,3,,D1221D,FFFFFF
+32,1,32,Santa Isabel - Bombarda,,3,,E6659F,FFFFFF
+33,1,33,Pinares de Venecia - Delicias,,3,,C5CE00,FFFFFF
+34,1,34,Estacion Delicias - Cementerio,,3,,7B1142,FFFFFF
+35,1,35,Parque Goya - Seminario,,3,,445C9F,FFFFFF
+36,1,36,Picarral - Valdefierro,,3,,0094D1,FFFFFF
+38,1,38,Bajo Aragon - Vía Hispanidad,,3,,8CA816,FFFFFF
+39,1,39,Pinares de Venecia - Vadorrey,,3,,6F58A0,FFFFFF
+40,1,40,San Jose - Plaza Aragón,,3,,A61464,FFFFFF
+41,1,41,Puerta del Carmen - Rosales del Canal,,3,,CF9E48,FFFFFF
+42,1,42,La Paz - Actur-Rey Fernando,,3,,1AB6C1,FFFFFF
+43,1,43,Juslibol - Actur-Rey Fernando,,3,,F8AD07,FFFFFF
+44,1,44,Estación Miraflores - Actur Rey Fernando,,3,,27A737,FFFFFF
+50,1,50,Vadorrey - San Gregorio,,3,,C13079,FFFFFF
+51,1,51,Pabellón Príncipe Felipe - Estación Delicias,,3,,DE5250,FFFFFF
+52,1,52,Miralbueno - Puerta del Carmen,,3,,0E6355,FFFFFF
+53,1,53,Plaza Emperador Carlos Quinto - Miralbueno ,,3,,DD1466,FFFFFF
+54,1,54,Rosales del Canal - Tranvía,,3,,DA4319,FFFFFF
+55,1,55,Montecanal - Tranvía,,3,,563680,FFFFFF
+56,1,56,Valdespartera - Tranvía,,3,,00A993,FFFFFF
+57,1,57,Casablanca - Tranvía,,3,,00422B,FFFFFF
+58,1,58,Fuente de La Junquera - Tranvía,,3,,008145,FFFFFF
+59,1,59,Arcosur - Tranvía,,3,,A5C715,FFFFFF
+60,1,60,Avda Estudiantes -  Actur Rey Fernando,,3,,472565,FFFFFF
+102,1,CEM,Puerta del Carmen - Cementerio,,3,,0052CC,FFFFFF
+103,1,CE,San Miguel - Cementerio,,3,,0052CC,FFFFFF
+104,1,LAN,Lanzadera Cementerio - Parque Atracciones,,3,,0052CC,FFFFFF
+107,1,ESP,Puerta del Carmen - Plaza Europa,,3,,0052CC,FFFFFF
+111,1,N1,Plaza Aragon - La Jota - Vadorrey - Santa Isabel,,3,,90CA46,000000
+112,1,N2,Plaza Aragón - La Almozara - Actur Rey F. - P. Goya - Arrabal,,3,,FF696B,000000
+113,1,N3,Paseo Pamplona - Delicias - Valdefierro - Miralbueno,,3,,00B9F2,000000
+114,1,N4,Paseo Pamplona - Romareda - Rosales del Canal - Arcosur,,3,,FB3199,000000
+115,1,N5,Plaza Aragón - Las Fuentes - S José - La Paz - Parque Venecia,,3,,F89E2A,000000
+116,1,N6,Paseo Pamplona - Plaza Roma - Vía Hispanidad - La Cartuja,,3,,4DC287,000000
+117,1,N7,Plaza Aragon - Arrabal - San Gregorio - Peñaflor,,3,,FFEB3D,000000
+201,1,V1,Valdespartera - Puerta Carmen,,3,,0052CC,FFFFFF
+203,1,ES3,Parking Norte - Maria Agustín,,3,,0052CC,FFFFFF
+204,1,V4,Valdespartera - Paseo Constitución,,3,,0052CC,FFFFFF
+306,1,V6,Paseo María Agustín - Noria Siria,,3,,0052CC,FFFFFF
+307,1,ES7,Puerta del Carmen - Voluntariado,,3,,0052CC,FFFFFF
+210,11,TRA,Tranvia L1 Valdespartera - Actur - Parque Goya,,0,,00CC00,FFFFFF

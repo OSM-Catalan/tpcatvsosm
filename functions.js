@@ -9,7 +9,230 @@ let searchData = {
 // Global variable to store sidebar scroll position
 let lastSidebarScrollPosition = 0;
 
-// Load search data from GTFS files
+// Global variable to store Nominatim bbox
+let nominatimBbox = null;
+
+// Global variable to store current GTFS folder
+window.currentGtfsFolder = 'gtfs_amb_bus'; // Default folder
+
+// Load GTFS folders starting with 'gtfs'
+async function loadGtfsFolders() {
+    try {
+        // Get the dropdown element
+        const dropdown = document.getElementById('gtfs-folder-select');
+        if (!dropdown) {
+            console.error('GTFS folder dropdown not found');
+            return;
+        }
+        
+        // Since we can't directly scan directories in browser, we'll use a predefined list
+        // In a real implementation, this would be provided by the server
+        const knownGtfsFolders = [
+            'gtfs_amb_bus',
+            'gtfs_zaragoza',
+            // Add more GTFS folders as needed
+        ];
+        
+        // For now, just use all known folders since HEAD requests might fail due to CORS
+        const availableFolders = [...knownGtfsFolders];
+        
+        // Try to detect if folders exist by attempting to fetch a common file (optional)
+        for (let i = availableFolders.length - 1; i >= 0; i--) {
+            try {
+                const response = await fetch(`${availableFolders[i]}/stops.txt`, { method: 'HEAD' });
+                if (!response.ok) {
+                    console.log(`Folder ${availableFolders[i]} not accessible via HEAD, but keeping in list`);
+                }
+            } catch (e) {
+                console.log(`Folder ${availableFolders[i]} HEAD request failed, but keeping in list`);
+            }
+        }
+        
+        // Populate the dropdown
+        dropdown.innerHTML = '<option value="">Select GTFS folder...</option>';
+        availableFolders.forEach(folder => {
+            const option = document.createElement('option');
+            option.value = folder;
+            option.textContent = folder;
+            if (folder === window.currentGtfsFolder) {
+                option.selected = true;
+            }
+            dropdown.appendChild(option);
+        });
+        
+        console.log('Available GTFS folders:', availableFolders);
+    } catch (error) {
+        console.error('Error loading GTFS folders:', error);
+        
+        // Fallback: at least populate with the default folder
+        const dropdown = document.getElementById('gtfs-folder-select');
+        if (dropdown) {
+            dropdown.innerHTML = '<option value="">Select GTFS folder...</option>';
+            const option = document.createElement('option');
+            option.value = 'gtfs_amb_bus';
+            option.textContent = 'gtfs_amb_bus';
+            option.selected = true;
+            dropdown.appendChild(option);
+        }
+    }
+}
+
+// Get current GTFS folder path
+function getGtfsPath(filename) {
+    return `${window.currentGtfsFolder}/${filename}`;
+}
+
+// Initialize GTFS folder dropdown immediately (synchronous version)
+function initializeGtfsFolderDropdown() {
+    const dropdown = document.getElementById('gtfs-folder-select');
+    if (!dropdown) {
+        console.error('GTFS folder dropdown not found during initialization');
+        return;
+    }
+    
+    // Populate with known folders immediately
+    const knownGtfsFolders = [
+        'gtfs_amb_bus',
+        'gtfs_zaragoza',
+        // Add more GTFS folders as needed
+    ];
+    
+    dropdown.innerHTML = '<option value="">Select GTFS folder...</option>';
+    knownGtfsFolders.forEach(folder => {
+        const option = document.createElement('option');
+        option.value = folder;
+        option.textContent = folder;
+        if (folder === window.currentGtfsFolder) {
+            option.selected = true;
+        }
+        dropdown.appendChild(option);
+    });
+    
+    console.log('GTFS folder dropdown initialized with:', knownGtfsFolders);
+}
+
+// Perform Nominatim search to get location bbox
+async function performNominatimSearch(query) {
+    try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1&extratags=1`);
+        const results = await response.json();
+        
+        displayNominatimResults(results, query);
+    } catch (error) {
+        console.error('Error performing Nominatim search:', error);
+        nominatimResults.innerHTML = '<div class="search-result-item">Search error. Please try again.</div>';
+        nominatimResults.style.display = 'block';
+    }
+}
+
+// Display Nominatim search results
+function displayNominatimResults(results, query) {
+    nominatimResults.innerHTML = '';
+    
+    if (results.length === 0) {
+        nominatimResults.innerHTML = '<div class="search-result-item">No results found</div>';
+        nominatimResults.style.display = 'block';
+        return;
+    }
+    
+    results.forEach(result => {
+        const item = document.createElement('div');
+        item.className = 'search-result-item';
+        
+        const displayName = result.display_name || result.name;
+        const type = result.type || 'place';
+        const importance = result.importance || 0;
+        
+        item.innerHTML = `
+            <div class="search-result-type">${type.charAt(0).toUpperCase() + type.slice(1)}</div>
+            <div class="search-result-name">${highlightMatch(displayName, query)}</div>
+            <div class="search-result-details">Importance: ${(importance * 100).toFixed(1)}%</div>
+        `;
+        
+        item.addEventListener('click', () => {
+            selectNominatimResult(result);
+            nominatimResults.style.display = 'none';
+            nominatimSearch.value = displayName;
+        });
+        
+        nominatimResults.appendChild(item);
+    });
+    
+    nominatimResults.style.display = 'block';
+}
+
+// Select a Nominatim result and set bbox
+function selectNominatimResult(result) {
+    // Store the bbox from Nominatim result
+    if (result.boundingbox) {
+        nominatimBbox = {
+            south: parseFloat(result.boundingbox[0]),
+            north: parseFloat(result.boundingbox[1]),
+            west: parseFloat(result.boundingbox[2]),
+            east: parseFloat(result.boundingbox[3])
+        };
+        
+        // Center map on the selected area
+        const centerLat = (nominatimBbox.south + nominatimBbox.north) / 2;
+        const centerLon = (nominatimBbox.west + nominatimBbox.east) / 2;
+        
+        map.setView([centerLat, centerLon], 12);
+        
+        // Add visual feedback - draw rectangle for the selected area
+        if (window.nominatimRectangle) {
+            map.removeLayer(window.nominatimRectangle);
+        }
+        
+        const bounds = [[nominatimBbox.south, nominatimBbox.west], [nominatimBbox.north, nominatimBbox.east]];
+        window.nominatimRectangle = L.rectangle(bounds, {
+            color: '#ff7800',
+            weight: 2,
+            fillOpacity: 0.1,
+            fillColor: '#ff7800'
+        }).addTo(map);
+        
+        // Add popup with area information
+        const areaInfo = `
+            <b>Selected Area</b><br>
+            ${result.display_name}<br>
+            Type: ${result.type}<br>
+            BBox: ${nominatimBbox.south.toFixed(4)}, ${nominatimBbox.west.toFixed(4)} to ${nominatimBbox.north.toFixed(4)}, ${nominatimBbox.east.toFixed(4)}<br>
+            <small>This area will be used for Overpass queries</small>
+        `;
+        window.nominatimRectangle.bindPopup(areaInfo).openPopup();
+        
+        console.log('Nominatim bbox set:', nominatimBbox);
+    } else {
+        // If no bbox, use lat/lon with a small buffer
+        const lat = parseFloat(result.lat);
+        const lon = parseFloat(result.lon);
+        const buffer = 0.01; // ~1km buffer
+        
+        nominatimBbox = {
+            south: lat - buffer,
+            north: lat + buffer,
+            west: lon - buffer,
+            east: lon + buffer
+        };
+        
+        map.setView([lat, lon], 15);
+        
+        if (window.nominatimRectangle) {
+            map.removeLayer(window.nominatimRectangle);
+        }
+        
+        const bounds = [[nominatimBbox.south, nominatimBbox.west], [nominatimBbox.north, nominatimBbox.east]];
+        window.nominatimRectangle = L.rectangle(bounds, {
+            color: '#ff7800',
+            weight: 2,
+            fillOpacity: 0.1,
+            fillColor: '#ff7800'
+        }).addTo(map);
+        
+        console.log('Nominatim point bbox set:', nominatimBbox);
+    }
+}
+
 async function loadSearchData() {
     try {
         // Load routes data
@@ -27,7 +250,7 @@ async function loadSearchData() {
 // Load GTFS routes for search
 async function loadGtfsRoutesForSearch() {
     try {
-        const response = await fetch('gtfs_amb_bus/routes.txt');
+        const response = await fetch(getGtfsPath('routes.txt'));
         const csvText = await response.text();
         const lines = csvText.split('\n');
         
@@ -56,7 +279,7 @@ async function loadGtfsRoutesForSearch() {
 // Load GTFS stops for search
 async function loadGtfsStopsForSearch() {
     try {
-        const response = await fetch('gtfs_amb_bus/stops.txt');
+        const response = await fetch(getGtfsPath('stops.txt'));
         const csvText = await response.text();
         const lines = csvText.split('\n');
         
@@ -706,11 +929,24 @@ function showContextMenu(event, stop, type) {
 
 // Load OSM stops via Overpass
 async function loadOsmStops() {
-    const bounds = map.getBounds();
-    const south = bounds.getSouth();
-    const west = bounds.getWest();
-    const north = bounds.getNorth();
-    const east = bounds.getEast();
+    let south, west, north, east;
+    
+    // Use Nominatim bbox if available, otherwise use current map bounds
+    if (nominatimBbox) {
+        south = nominatimBbox.south;
+        west = nominatimBbox.west;
+        north = nominatimBbox.north;
+        east = nominatimBbox.east;
+        console.log('Using Nominatim bbox for Overpass query:', nominatimBbox);
+    } else {
+        const bounds = map.getBounds();
+        south = bounds.getSouth();
+        west = bounds.getWest();
+        north = bounds.getNorth();
+        east = bounds.getEast();
+        console.log('Using current map bounds for Overpass query');
+    }
+    
     const bboxCoords = `${south},${west},${north},${east}`;
     const query = `
         [out:json][timeout:45][maxsize:1048576];
@@ -792,7 +1028,7 @@ async function loadOsmStops() {
 // Load GTFS stops
 async function loadGtfsStops() {
     try {
-        const response = await fetch('gtfs_amb_bus/stops.txt');
+        const response = await fetch(getGtfsPath('stops.txt'));
         const csvText = await response.text();
         const lines = csvText.split('\n');
         gtfsStopsLayer = L.layerGroup();
@@ -1196,7 +1432,7 @@ function createPaginationControls(totalItems) {
 // Load GTFS trips
 async function loadGtfsTrips() {
     try {
-        const response = await fetch('gtfs_amb_bus/trips.txt');
+        const response = await fetch(getGtfsPath('trips.txt'));
         const csvText = await response.text();
         const lines = csvText.split('\n');
 
@@ -1230,7 +1466,7 @@ async function loadGtfsTrips() {
 // Load GTFS shapes
 async function loadGtfsShapes() {
     try {
-        const response = await fetch('gtfs_amb_bus/shapes.txt');
+        const response = await fetch(getGtfsPath('shapes.txt'));
         const csvText = await response.text();
         const lines = csvText.split('\n');
 
@@ -1279,7 +1515,7 @@ async function loadGtfsShapes() {
 // Load GTFS stops data (without displaying)
 async function loadGtfsStopsData() {
     try {
-        const response = await fetch('gtfs_amb_bus/stops.txt');
+        const response = await fetch(getGtfsPath('stops.txt'));
         const csvText = await response.text();
         const lines = csvText.split('\n');
 
@@ -1312,7 +1548,7 @@ async function loadGtfsStopsData() {
 // Load GTFS stop times
 async function loadGtfsStopTimes() {
     try {
-        const response = await fetch('gtfs_amb_bus/stop_times.txt');
+        const response = await fetch(getGtfsPath('stop_times.txt'));
         const csvText = await response.text();
         const lines = csvText.split('\n');
 
@@ -1569,7 +1805,7 @@ async function loadOsmStopsForRoute(route) {
 // Load GTFS routes
 async function loadGtfsRoutes() {
     try {
-        const response = await fetch('gtfs_amb_bus/routes.txt');
+        const response = await fetch(getGtfsPath('routes.txt'));
         const csvText = await response.text();
         const lines = csvText.split('\n');
 

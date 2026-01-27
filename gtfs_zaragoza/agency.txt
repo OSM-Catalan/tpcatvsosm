@@ -1,0 +1,3 @@
+agency_id,agency_name,agency_url,agency_timezone,agency_lang,agency_phone,agency_fare_url,agency_email
+1,Avanza Zaragoza S.A.U.,http://zaragoza.avanzagrupo.com/,Europe/Madrid,es,976413900,https://zaragoza.avanzagrupo.com/tarifas-y-titulos/,info.zaragoza@avanzagrupo.com
+11,Tranvías Urbanos de Zaragoza S.L.,https://www.tranviasdezaragoza.es,Europe/Madrid,es,900920700,https://www.tranviasdezaragoza.es/titulos-y-tarifas/,
