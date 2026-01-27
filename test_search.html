@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Search Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .result { background: #f0f0f0; padding: 10px; margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <h1>Predictive Search Test</h1>
+    
+    <div class="test-section">
+        <h2>Test Search Functionality</h2>
+        <input type="text" id="testSearch" placeholder="Type to test search..." style="width: 300px; padding: 5px;">
+        <button onclick="testSearchFunction()">Test Search</button>
+        <div id="testResults"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Load Search Data</h2>
+        <button onclick="loadTestData()">Load Test Data</button>
+        <div id="loadStatus"></div>
+    </div>
+
+    <script>
+        // Mock search data for testing
+        let testData = {
+            routes: [
+                { id: '128', shortName: '86', longName: 'Horta/El Carmel', color: '#ffaa00' },
+                { id: '129', shortName: '87', longName: 'Horta-Gràcia', color: '#ffaa00' },
+                { id: '130', shortName: 'A1', longName: 'Aerobús Barcelona-Aeroport T1', color: '#9fd6f6' }
+            ],
+            stops: [
+                { id: '1001', name: 'Plaça Catalunya', lat: 41.3851, lon: 2.1734 },
+                { id: '1002', name: 'Passeig de Gràcia', lat: 41.3900, lon: 2.1650 },
+                { id: '1003', name: 'Catalunya', lat: 41.3800, lon: 2.1700 }
+            ]
+        };
+
+        function loadTestData() {
+            document.getElementById('loadStatus').innerHTML = '<div class="result">Test data loaded: ' + testData.routes.length + ' routes, ' + testData.stops.length + ' stops</div>';
+        }
+
+        function testSearchFunction() {
+            const query = document.getElementById('testSearch').value.trim();
+            const resultsDiv = document.getElementById('testResults');
+            
+            if (query.length < 2) {
+                resultsDiv.innerHTML = '<div class="result">Type at least 2 characters to search</div>';
+                return;
+            }
+
+            const results = [];
+            const lowerQuery = query.toLowerCase();
+            
+            // Search routes
+            testData.routes.forEach(route => {
+                let score = 0;
+                if (route.shortName.toLowerCase() === lowerQuery) score = 100;
+                else if (route.shortName.toLowerCase().startsWith(lowerQuery)) score = 80;
+                else if (route.shortName.toLowerCase().includes(lowerQuery)) score = 60;
+                else if (route.longName.toLowerCase().includes(lowerQuery)) score = 40;
+                
+                if (score > 0) {
+                    results.push({
+                        type: 'route',
+                        data: route,
+                        score: score
+                    });
+                }
+            });
+            
+            // Search stops
+            testData.stops.forEach(stop => {
+                let score = 0;
+                if (stop.name.toLowerCase() === lowerQuery) score = 90;
+                else if (stop.name.toLowerCase().startsWith(lowerQuery)) score = 70;
+                else if (stop.name.toLowerCase().includes(lowerQuery)) score = 50;
+                
+                if (score > 0) {
+                    results.push({
+                        type: 'stop',
+                        data: stop,
+                        score: score
+                    });
+                }
+            });
+            
+            // Sort by score
+            results.sort((a, b) => b.score - a.score);
+            
+            // Display results
+            let html = '<h3>Search Results for "' + query + '":</h3>';
+            if (results.length === 0) {
+                html += '<div class="result">No results found</div>';
+            } else {
+                results.forEach(result => {
+                    if (result.type === 'route') {
+                        html += '<div class="result"><strong>Line ' + result.data.shortName + '</strong> - ' + result.data.longName + ' (Score: ' + result.score + ')</div>';
+                    } else {
+                        html += '<div class="result"><strong>Stop:</strong> ' + result.data.name + ' (Score: ' + result.score + ')</div>';
+                    }
+                });
+            }
+            
+            resultsDiv.innerHTML = html;
+        }
+
+        // Add enter key support
+        document.getElementById('testSearch').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                testSearchFunction();
+            }
+        });
+    </script>
+</body>
+</html>

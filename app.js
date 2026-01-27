@@ -59,6 +59,8 @@ let currentRoute = null;
 // Controls
 const layerSelect = document.getElementById('layer-select');
 const stopsSelect = document.getElementById('stops-select');
+const searchInput = document.getElementById('search-input');
+const searchResults = document.getElementById('search-results');
 const loadStopsBtn = document.getElementById('load-stops-btn');
 const calculateDifferencesBtn = document.getElementById('calculate-differences-btn');
 const cleanMapBtn = document.getElementById('clean-map-btn');
@@ -162,4 +164,33 @@ processShapesBtn.addEventListener('click', async function() {
         console.error('Error processing GTFS shapes:', error);
         alert('Error processing GTFS shapes. Please try again.');
     }
+});
+
+// Search functionality
+let searchTimeout;
+searchInput.addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    const query = this.value.trim();
+    
+    if (query.length < 2) {
+        searchResults.style.display = 'none';
+        return;
+    }
+    
+    // Debounce search
+    searchTimeout = setTimeout(() => {
+        performSearch(query);
+    }, 300);
+});
+
+// Close search results when clicking outside
+document.addEventListener('click', function(e) {
+    if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+        searchResults.style.display = 'none';
+    }
+});
+
+// Initialize search data on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadSearchData();
 });

@@ -66,24 +66,25 @@
         }
         #icon-sidebar {
             position: absolute;
-            top: 600px;
-            right: 10px;
+            top: 10px;
+            left: 10px;
             z-index: 999;
             background: white;
             border-radius: 15px;
             box-shadow: 0 2px 15px rgba(0,0,0,0.2);
             padding: 15px;
             display: flex;
-            flex-wrap: wrap;
+            flex-direction: column;
             gap: 10px;
-            max-width: 300px;
-            justify-content: center;
+            max-width: 60px;
+            align-items: center;
             transition: all 0.3s ease;
         }
         #icon-sidebar.minimized {
             width: 40px;
             height: 40px;
             max-width: 40px;
+            max-height: 40px;
             padding: 0;
             overflow: hidden;
         }
@@ -115,11 +116,41 @@
             background: #007bff;
             color: white;
         }
+        #icon-sidebar .close-btn {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 20px;
+            height: 20px;
+            border: none;
+            background: #dc3545;
+            color: white;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            z-index: 1001;
+            transition: all 0.2s ease;
+        }
+        
+        #icon-sidebar .close-btn:hover {
+            background: #c82333;
+            transform: scale(1.1);
+        }
+        
+        #icon-sidebar.minimized .close-btn {
+            top: 8px;
+            right: 8px;
+        }
+        
         .tooltip {
             position: absolute;
-            bottom: 55px;
-            left: 50%;
-            transform: translateX(-50%);
+            left: 55px;
+            top: 50%;
+            transform: translateY(-50%);
             background: #333;
             color: white;
             padding: 5px 10px;
@@ -129,6 +160,7 @@
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.3s ease;
+            z-index: 1000;
         }
         .icon-btn:hover .tooltip {
             opacity: 1;
@@ -233,6 +265,71 @@
         .context-menu-item:hover {
             background: #f0f0f0;
         }
+        
+        #search-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            background: white;
+            font-size: 14px;
+            color: #495057;
+            box-sizing: border-box;
+        }
+        
+        #search-input:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+        }
+        
+        .search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1001;
+            display: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .search-result-item {
+            padding: 10px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #f8f9fa;
+            font-size: 13px;
+            transition: background-color 0.2s ease;
+        }
+        
+        .search-result-item:hover {
+            background: #f8f9fa;
+        }
+        
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+        
+        .search-result-type {
+            font-weight: 600;
+            color: #007bff;
+            margin-bottom: 2px;
+        }
+        
+        .search-result-name {
+            color: #495057;
+        }
+        
+        .search-result-details {
+            font-size: 11px;
+            color: #6c757d;
+            margin-top: 2px;
+        }
 
     </style>
 </head>
@@ -251,6 +348,16 @@
                 <option value="osm">OpenStreetMap</option>
                 <option value="icgc">ICGC Ortoimage</option>
             </select>
+        </div>
+        
+        <div class="controls-divider"></div>
+        
+        <div>
+            <label for="search-input">Search Lines & Stops</label>
+            <div style="position: relative;">
+                <input type="text" id="search-input" placeholder="Type line number or stop name..." autocomplete="off">
+                <div id="search-results" class="search-results"></div>
+            </div>
         </div>
         
         <div class="controls-divider"></div>

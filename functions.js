@@ -1,5 +1,598 @@
 // Functions for the webapp
 
+// Global search data
+let searchData = {
+    routes: [],
+    stops: []
+};
+
+// Global variable to store sidebar scroll position
+let lastSidebarScrollPosition = 0;
+
+// Load search data from GTFS files
+async function loadSearchData() {
+    try {
+        // Load routes data
+        await loadGtfsRoutesForSearch();
+        
+        // Load stops data
+        await loadGtfsStopsForSearch();
+        
+        console.log(`Search data loaded: ${searchData.routes.length} routes, ${searchData.stops.length} stops`);
+    } catch (error) {
+        console.error('Error loading search data:', error);
+    }
+}
+
+// Load GTFS routes for search
+async function loadGtfsRoutesForSearch() {
+    try {
+        const response = await fetch('gtfs_amb_bus/routes.txt');
+        const csvText = await response.text();
+        const lines = csvText.split('\n');
+        
+        searchData.routes = [];
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (line) {
+                const values = parseCsvLine(line);
+                if (values.length >= 4) {
+                    const route = {
+                        id: values[0],
+                        shortName: values[2] ? values[2].replace(/^"(.*)"$/, '$1') : '',
+                        longName: values[3] ? values[3].replace(/^"(.*)"$/, '$1') : '',
+                        color: values[7] || '#ffaa00',
+                        textColor: values[8] || '#000000'
+                    };
+                    searchData.routes.push(route);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error loading GTFS routes for search:', error);
+    }
+}
+
+// Load GTFS stops for search
+async function loadGtfsStopsForSearch() {
+    try {
+        const response = await fetch('gtfs_amb_bus/stops.txt');
+        const csvText = await response.text();
+        const lines = csvText.split('\n');
+        
+        searchData.stops = [];
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (line) {
+                const values = parseCsvLine(line);
+                if (values.length >= 6) {
+                    const lat = parseFloat(values[4]);
+                    const lon = parseFloat(values[5]);
+                    const name = values[2] ? values[2].replace(/^"(.*)"$/, '$1') : '';
+                    
+                    if (!isNaN(lat) && !isNaN(lon) && name) {
+                        const stop = {
+                            id: values[0],
+                            name: name,
+                            lat: lat,
+                            lon: lon
+                        };
+                        searchData.stops.push(stop);
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error loading GTFS stops for search:', error);
+    }
+}
+
+// Perform search with predictive functionality
+function performSearch(query) {
+    const results = [];
+    const lowerQuery = query.toLowerCase();
+    
+    // Search routes
+    searchData.routes.forEach(route => {
+        let score = 0;
+        let matchType = '';
+        
+        // Exact short name match (highest priority)
+        if (route.shortName.toLowerCase() === lowerQuery) {
+            score = 100;
+            matchType = 'exact_short';
+        }
+        // Starts with short name
+        else if (route.shortName.toLowerCase().startsWith(lowerQuery)) {
+            score = 80;
+            matchType = 'starts_with_short';
+        }
+        // Contains short name
+        else if (route.shortName.toLowerCase().includes(lowerQuery)) {
+            score = 60;
+            matchType = 'contains_short';
+        }
+        // Long name match
+        else if (route.longName.toLowerCase().includes(lowerQuery)) {
+            score = 40;
+            matchType = 'contains_long';
+        }
+        
+        if (score > 0) {
+            results.push({
+                type: 'route',
+                data: route,
+                score: score,
+                matchType: matchType
+            });
+        }
+    });
+    
+    // Search stops
+    searchData.stops.forEach(stop => {
+        let score = 0;
+        let matchType = '';
+        const stopNameLower = stop.name.toLowerCase();
+        
+        // Exact name match (highest priority)
+        if (stopNameLower === lowerQuery) {
+            score = 90;
+            matchType = 'exact_name';
+        }
+        // Starts with name
+        else if (stopNameLower.startsWith(lowerQuery)) {
+            score = 70;
+            matchType = 'starts_with_name';
+        }
+        // Contains name
+        else if (stopNameLower.includes(lowerQuery)) {
+            score = 50;
+            matchType = 'contains_name';
+        }
+        
+        if (score > 0) {
+            results.push({
+                type: 'stop',
+                data: stop,
+                score: score,
+                matchType: matchType
+            });
+        }
+    });
+    
+    // Sort by score (descending) and then by type (routes first)
+    results.sort((a, b) => {
+        if (a.score !== b.score) {
+            return b.score - a.score;
+        }
+        return a.type === 'route' ? -1 : 1;
+    });
+    
+    // Limit results to top 10
+    const limitedResults = results.slice(0, 10);
+    
+    displaySearchResults(limitedResults, query);
+}
+
+// Display search results
+function displaySearchResults(results, query) {
+    searchResults.innerHTML = '';
+    
+    if (results.length === 0) {
+        searchResults.innerHTML = '<div class="search-result-item">No results found</div>';
+        searchResults.style.display = 'block';
+        return;
+    }
+    
+    results.forEach(result => {
+        const item = document.createElement('div');
+        item.className = 'search-result-item';
+        
+        if (result.type === 'route') {
+            const route = result.data;
+            item.innerHTML = `
+                <div class="search-result-type">Line ${route.shortName}</div>
+                <div class="search-result-name">${highlightMatch(route.longName, query)}</div>
+                <div class="search-result-details">Route ID: ${route.id}</div>
+            `;
+            
+            item.addEventListener('click', () => {
+                // Save current scroll position before navigating
+                const stopsList = document.getElementById('stops-list');
+                lastSidebarScrollPosition = stopsList.scrollTop;
+                
+                selectRoute(route);
+                searchResults.style.display = 'none';
+                searchInput.value = `${route.shortName} - ${route.longName}`;
+            });
+        } else if (result.type === 'stop') {
+            const stop = result.data;
+            item.innerHTML = `
+                <div class="search-result-type">Stop</div>
+                <div class="search-result-name">${highlightMatch(stop.name, query)}</div>
+                <div class="search-result-details">ID: ${stop.id}</div>
+            `;
+            
+            item.addEventListener('click', () => {
+                selectStop(stop);
+                searchResults.style.display = 'none';
+                searchInput.value = stop.name;
+            });
+        }
+        
+        searchResults.appendChild(item);
+    });
+    
+    searchResults.style.display = 'block';
+}
+
+// Highlight matching text in results
+function highlightMatch(text, query) {
+    const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
+    return text.replace(regex, '<strong>$1</strong>');
+}
+
+// Escape regex special characters
+function escapeRegex(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Select a route and display it on the map
+async function selectRoute(route) {
+    try {
+        // Set current route
+        currentRoute = route;
+        
+        // Load necessary data if not already loaded
+        if (routesData.length === 0) {
+            await loadGtfsDataAndPopulateLines();
+        }
+        
+        // Find the full route data from routesData
+        const fullRouteData = routesData.find(r => r.id === route.id);
+        if (!fullRouteData) {
+            // If not found, add the search route data to routesData
+            routesData.push({
+                ...route,
+                agencyId: '73' // Default agency ID
+            });
+        }
+        
+        // Display the route with all buttons using the same function as the lines list
+        // Don't auto-load route geometry and stops - just show the interface
+        displayRouteWithButtons(route);
+        
+    } catch (error) {
+        console.error('Error selecting route:', error);
+        alert('Error loading route. Please try again.');
+    }
+}
+
+// Display a single route with all buttons (same as in populateSidebarWithLines)
+function displayRouteWithButtons(route) {
+    const stopsList = document.getElementById('stops-list');
+    stopsList.innerHTML = '';
+
+    // Add back button at the top
+    const backBtn = document.createElement('button');
+    backBtn.textContent = '← Back to Lines';
+    backBtn.style.marginBottom = '10px';
+    backBtn.style.padding = '8px 12px';
+    backBtn.style.backgroundColor = '#007bff';
+    backBtn.style.color = 'white';
+    backBtn.style.border = 'none';
+    backBtn.style.borderRadius = '4px';
+    backBtn.style.cursor = 'pointer';
+    backBtn.style.fontSize = '12px';
+    backBtn.addEventListener('click', () => {
+        populateSidebarWithLines();
+    });
+    stopsList.appendChild(backBtn);
+
+    const lineContainer = document.createElement('div');
+    lineContainer.style.marginBottom = '15px';
+    lineContainer.style.border = '1px solid #ddd';
+    lineContainer.style.padding = '10px';
+    lineContainer.style.borderRadius = '5px';
+
+    const lineItem = document.createElement('div');
+    lineItem.className = 'stop-item';
+    lineItem.style.cursor = 'pointer';
+    lineItem.style.fontWeight = 'bold';
+    
+    // Route title
+    const titleSpan = document.createElement('span');
+    titleSpan.textContent = `${route.agencyId || '73'}-${route.shortName}: ${route.longName}`;
+    titleSpan.style.display = 'block';
+    titleSpan.style.marginBottom = '8px';
+    
+    lineItem.appendChild(titleSpan);
+    
+    lineItem.addEventListener('click', () => {
+        // Save current scroll position before navigating
+        const stopsList = document.getElementById('stops-list');
+        lastSidebarScrollPosition = stopsList.scrollTop;
+        
+        // Set current route
+        currentRoute = route;
+        
+        // Don't auto-load - just set as current route
+        // User can click specific buttons to load what they want
+        console.log(`Route ${route.shortName} selected. Click buttons below to load data.`);
+    });
+
+    // Create buttons container
+    const buttonsContainer = document.createElement('div');
+    buttonsContainer.style.marginTop = '8px';
+    buttonsContainer.style.display = 'flex';
+    buttonsContainer.style.flexDirection = 'column';
+    buttonsContainer.style.gap = '5px';
+
+    // First row: OSM and GTFS track buttons
+    const trackButtonsContainer = document.createElement('div');
+    trackButtonsContainer.style.display = 'flex';
+    trackButtonsContainer.style.gap = '5px';
+
+    // OSM Overpass button
+    const osmButton = document.createElement('button');
+    osmButton.textContent = 'OSM Track';
+    osmButton.style.fontSize = '11px';
+    osmButton.style.padding = '4px 8px';
+    osmButton.style.backgroundColor = '#007cba';
+    osmButton.style.color = 'white';
+    osmButton.style.border = 'none';
+    osmButton.style.borderRadius = '3px';
+    osmButton.style.cursor = 'pointer';
+    osmButton.addEventListener('click', () => {
+        currentRoute = route;
+        openOsmTrackOverpass(route);
+    });
+
+    // GTFS file button
+    const gtfsButton = document.createElement('button');
+    gtfsButton.textContent = 'GTFS Track';
+    gtfsButton.style.fontSize = '11px';
+    gtfsButton.style.padding = '4px 8px';
+    gtfsButton.style.backgroundColor = '#28a745';
+    gtfsButton.style.color = 'white';
+    gtfsButton.style.border = 'none';
+    gtfsButton.style.borderRadius = '3px';
+    gtfsButton.style.cursor = 'pointer';
+    gtfsButton.addEventListener('click', () => {
+        currentRoute = route;
+        openGtfsTrack(route);
+    });
+
+    trackButtonsContainer.appendChild(osmButton);
+    trackButtonsContainer.appendChild(gtfsButton);
+
+    // Check if shapes exist for this route and add shapes button
+    const routeTrips = tripsData.filter(trip => trip.routeId === route.id);
+    const shapeIds = [...new Set(routeTrips.map(trip => trip.shapeId).filter(id => id))];
+    
+    if (shapeIds.length > 0) {
+        // Check if shapes actually exist in shapesData
+        let actualShapesCount = 0;
+        shapeIds.forEach(shapeId => {
+            if (window.shapesData && window.shapesData[shapeId] && window.shapesData[shapeId].length > 0) {
+                actualShapesCount++;
+            }
+        });
+        
+        // Only show button if there are actual shape points
+        if (actualShapesCount > 0) {
+            // Third row: Shapes.txt button (only if shapes exist)
+            const shapesButtonContainer = document.createElement('div');
+            shapesButtonContainer.style.display = 'flex';
+            shapesButtonContainer.style.gap = '5px';
+
+            // Shapes.txt button
+            const shapesButton = document.createElement('button');
+            shapesButton.textContent = 'GTFS Shapes';
+            shapesButton.style.fontSize = '11px';
+            shapesButton.style.padding = '4px 8px';
+            shapesButton.style.backgroundColor = '#6f42c1';
+            shapesButton.style.color = 'white';
+            shapesButton.style.border = 'none';
+            shapesButton.style.borderRadius = '3px';
+            shapesButton.style.cursor = 'pointer';
+            shapesButton.style.flex = '1';
+            shapesButton.addEventListener('click', () => {
+                showShapesOnMap(route);
+            });
+
+            shapesButtonContainer.appendChild(shapesButton);
+            buttonsContainer.appendChild(shapesButtonContainer);
+        }
+    }
+
+    // Second row: Direction buttons
+    const directionButtonsContainer = document.createElement('div');
+    directionButtonsContainer.style.display = 'flex';
+    directionButtonsContainer.style.gap = '5px';
+
+    // IDA (Forward) button
+    const idaButton = document.createElement('button');
+    idaButton.textContent = 'Load OSM Stops';
+    idaButton.style.fontSize = '11px';
+    idaButton.style.padding = '4px 8px';
+    idaButton.style.backgroundColor = '#28a745';
+    idaButton.style.color = 'white';
+    idaButton.style.border = 'none';
+    idaButton.style.borderRadius = '3px';
+    idaButton.style.cursor = 'pointer';
+    idaButton.style.flex = '1';
+    idaButton.addEventListener('click', () => {
+        // Save current scroll position before navigating
+        const stopsList = document.getElementById('stops-list');
+        lastSidebarScrollPosition = stopsList.scrollTop;
+        
+        loadOsmStopsForIdaDirection(route);
+    });
+
+    // Load GTFS Stops button
+    const loadGtfsStopsBtn = document.createElement('button');
+    loadGtfsStopsBtn.textContent = 'Load GTFS Stops';
+    loadGtfsStopsBtn.style.fontSize = '11px';
+    loadGtfsStopsBtn.style.padding = '4px 8px';
+    loadGtfsStopsBtn.style.backgroundColor = '#007bff';
+    loadGtfsStopsBtn.style.color = 'white';
+    loadGtfsStopsBtn.style.border = 'none';
+    loadGtfsStopsBtn.style.borderRadius = '3px';
+    loadGtfsStopsBtn.style.cursor = 'pointer';
+    loadGtfsStopsBtn.style.flex = '1';
+    loadGtfsStopsBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Save current scroll position before navigating
+        const stopsList = document.getElementById('stops-list');
+        lastSidebarScrollPosition = stopsList.scrollTop;
+        
+        currentRoute = route;
+        loadGtfsStopsForRoute(route.id);
+    });
+
+    directionButtonsContainer.appendChild(idaButton);
+    directionButtonsContainer.appendChild(loadGtfsStopsBtn);
+
+    // Compare Stops button
+    const compareStopsBtn = document.createElement('button');
+    compareStopsBtn.textContent = 'Compare Stops';
+    compareStopsBtn.style.fontSize = '11px';
+    compareStopsBtn.style.padding = '4px 8px';
+    compareStopsBtn.style.backgroundColor = '#ffc107';
+    compareStopsBtn.style.color = '#212529';
+    compareStopsBtn.style.border = 'none';
+    compareStopsBtn.style.borderRadius = '3px';
+    compareStopsBtn.style.cursor = 'pointer';
+    compareStopsBtn.style.flex = '1';
+    compareStopsBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        compareRouteStops(route);
+    });
+
+    directionButtonsContainer.appendChild(compareStopsBtn);
+
+    buttonsContainer.appendChild(trackButtonsContainer);
+    buttonsContainer.appendChild(directionButtonsContainer);
+
+    lineContainer.appendChild(lineItem);
+    lineContainer.appendChild(buttonsContainer);
+    stopsList.appendChild(lineContainer);
+}
+
+// Select a stop and show it on the map
+function selectStop(stop) {
+    // Clear existing layers
+    if (routeLayer) {
+        map.removeLayer(routeLayer);
+    }
+    routeLayer = L.layerGroup();
+    
+    // Add stop marker
+    const marker = L.circleMarker([stop.lat, stop.lon], {
+        color: '#007bff',
+        fillColor: '#007bff',
+        fillOpacity: 0.7,
+        radius: 30
+    }).bindPopup(`<b>${stop.name}</b><br>
+        Stop ID: ${stop.id}<br>
+        <a href="http://127.0.0.1:8111/load_and_zoom?left=${stop.lon-0.001}&right=${stop.lon+0.001}&top=${stop.lat+0.001}&bottom=${stop.lat-0.001}" target="_blank">Open in JOSM</a><br>
+        <a href="https://www.openstreetmap.org/edit?editor=id&map=${stop.lat}/${stop.lon}" target="_blank">Open in iD editor</a>`);
+    
+    routeLayer.addLayer(marker);
+    map.addLayer(routeLayer);
+    
+    // Center map on stop
+    map.setView([stop.lat, stop.lon], 16);
+    
+    // Update sidebar with stop information
+    updateSidebarWithStopInfo(stop);
+}
+
+// Draw route shape on map
+async function drawRouteShape(routeId, color) {
+    try {
+        await loadGtfsShapes();
+        
+        // Find trips for this route
+        const routeTrips = tripsData.filter(trip => trip.routeId === routeId);
+        if (routeTrips.length === 0) return;
+        
+        // Get unique shape IDs for this route
+        const shapeIds = [...new Set(routeTrips.map(trip => trip.shapeId).filter(id => id))];
+        
+        // Draw each shape
+        shapeIds.forEach(shapeId => {
+            const shapePoints = window.shapesData[shapeId];
+            if (shapePoints && shapePoints.length > 1) {
+                const latLngs = shapePoints.map(point => [point.lat, point.lon]);
+                const polyline = L.polyline(latLngs, {
+                    color: color || '#ffaa00',
+                    weight: 4,
+                    opacity: 0.7
+                }).bindPopup(`Route shape for route ${routeId}`);
+                
+                routeLayer.addLayer(polyline);
+            }
+        });
+    } catch (error) {
+        console.error('Error drawing route shape:', error);
+    }
+}
+
+// Update sidebar with route information
+function updateSidebarWithRouteInfo(route, stops) {
+    const stopsList = document.getElementById('stops-list');
+    stopsList.innerHTML = `
+        <h4>Line ${route.shortName}</h4>
+        <p><strong>${route.longName}</strong></p>
+        <p>Route ID: ${route.id}</p>
+        <p>Total stops: ${stops.length}</p>
+        <hr>
+        <h5>Stops:</h5>
+    `;
+    
+    stops.forEach((stop, index) => {
+        const stopItem = document.createElement('div');
+        stopItem.className = 'stop-item';
+        stopItem.innerHTML = `<strong>${index + 1}.</strong> ${stop.name}`;
+        stopItem.addEventListener('click', () => {
+            map.setView([stop.lat, stop.lon], 17);
+        });
+        stopsList.appendChild(stopItem);
+    });
+}
+
+// Update sidebar with stop information
+function updateSidebarWithStopInfo(stop) {
+    const stopsList = document.getElementById('stops-list');
+    stopsList.innerHTML = `
+        <h4>Stop Information</h4>
+        <p><strong>${stop.name}</strong></p>
+        <p>Stop ID: ${stop.id}</p>
+        <p>Coordinates: ${stop.lat.toFixed(6)}, ${stop.lon.toFixed(6)}</p>
+    `;
+    
+    // Add back button
+    const backBtn = document.createElement('button');
+    backBtn.textContent = '← Back to Lines';
+    backBtn.style.marginTop = '10px';
+    backBtn.style.padding = '8px 12px';
+    backBtn.style.backgroundColor = '#007bff';
+    backBtn.style.color = 'white';
+    backBtn.style.border = 'none';
+    backBtn.style.borderRadius = '4px';
+    backBtn.style.cursor = 'pointer';
+    backBtn.style.fontSize = '12px';
+    backBtn.addEventListener('click', () => {
+        populateSidebarWithLines();
+    });
+    stopsList.appendChild(backBtn);
+}
+
 // Simple CSV line parser
 function parseCsvLine(line) {
     const result = [];
@@ -2898,6 +3491,9 @@ function populateSidebarWithLines() {
         lineItem.appendChild(titleSpan);
         
         lineItem.addEventListener('click', () => {
+            // Save current scroll position before navigating
+            lastSidebarScrollPosition = stopsList.scrollTop;
+            
             // Set current route
             currentRoute = route;
 
@@ -3017,6 +3613,9 @@ function populateSidebarWithLines() {
         idaButton.style.cursor = 'pointer';
         idaButton.style.flex = '1';
         idaButton.addEventListener('click', () => {
+            // Save current scroll position before navigating
+            lastSidebarScrollPosition = stopsList.scrollTop;
+            
             loadOsmStopsForIdaDirection(route);
         });
 
@@ -3034,6 +3633,9 @@ function populateSidebarWithLines() {
         loadGtfsStopsBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
+            
+            // Save current scroll position before navigating
+            lastSidebarScrollPosition = stopsList.scrollTop;
             
             // Set current route
             currentRoute = route;
@@ -3071,6 +3673,13 @@ function populateSidebarWithLines() {
         lineContainer.appendChild(buttonsContainer);
         stopsList.appendChild(lineContainer);
     });
+    
+    // Restore scroll position after a short delay to ensure content is rendered
+    setTimeout(() => {
+        if (lastSidebarScrollPosition > 0) {
+            stopsList.scrollTop = lastSidebarScrollPosition;
+        }
+    }, 100);
 }
 
 // Compare OSM and GTFS stops for a route
