@@ -19,6 +19,104 @@ function toggleIconSidebar() {
     iconSidebar.classList.toggle('minimized');
 }
 
+// Resize functionality for sidebar
+function initSidebarResize() {
+    const sidebar = document.getElementById('sidebar');
+    const resizeHandle = sidebar.querySelector('.resize-handle');
+    
+    if (!resizeHandle) return;
+    
+    let isResizing = false;
+    let startY = 0;
+    let startHeight = 0;
+    
+    resizeHandle.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        startY = e.clientY;
+        startHeight = sidebar.offsetHeight;
+        
+        document.body.style.cursor = 'ns-resize';
+        document.body.style.userSelect = 'none';
+        
+        e.preventDefault();
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+        
+        const deltaY = e.clientY - startY;
+        const newHeight = startHeight + deltaY;
+        
+        // Apply constraints
+        const minHeight = 200;
+        const maxHeight = window.innerHeight - 20;
+        
+        if (newHeight >= minHeight && newHeight <= maxHeight) {
+            sidebar.style.height = newHeight + 'px';
+        }
+    });
+    
+    document.addEventListener('mouseup', () => {
+        if (isResizing) {
+            isResizing = false;
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        }
+    });
+}
+
+// Resize functionality for controls panel
+function initControlsPanelResize() {
+    const controlsPanel = document.getElementById('controls-panel');
+    const resizeHandle = controlsPanel.querySelector('.resize-handle-controls');
+    
+    if (!resizeHandle) return;
+    
+    let isResizing = false;
+    let startY = 0;
+    let startHeight = 0;
+    
+    resizeHandle.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        startY = e.clientY;
+        startHeight = controlsPanel.offsetHeight;
+        
+        document.body.style.cursor = 'ns-resize';
+        document.body.style.userSelect = 'none';
+        
+        e.preventDefault();
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+        
+        const deltaY = e.clientY - startY;
+        const newHeight = startHeight + deltaY;
+        
+        // Apply constraints
+        const minHeight = 150;
+        const maxHeight = window.innerHeight - 20;
+        
+        if (newHeight >= minHeight && newHeight <= maxHeight) {
+            controlsPanel.style.height = newHeight + 'px';
+        }
+    });
+    
+    document.addEventListener('mouseup', () => {
+        if (isResizing) {
+            isResizing = false;
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        }
+    });
+}
+
+// Initialize resize when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    initSidebarResize();
+    initControlsPanelResize();
+});
+
 // Add zoom control explicitly
 L.control.zoom({
     position: 'bottomleft'
@@ -64,6 +162,8 @@ const searchResults = document.getElementById('search-results');
 const nominatimSearch = document.getElementById('nominatim-search');
 const nominatimResults = document.getElementById('nominatim-results');
 const gtfsFolderSelect = document.getElementById('gtfs-folder-select');
+const overpassServerSelect = document.getElementById('overpass-server-select');
+const transportModeSelect = document.getElementById('transport-mode-select');
 const loadStopsBtn = document.getElementById('load-stops-btn');
 const calculateDifferencesBtn = document.getElementById('calculate-differences-btn');
 const cleanMapBtn = document.getElementById('clean-map-btn');

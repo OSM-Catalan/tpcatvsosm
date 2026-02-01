@@ -295,7 +295,65 @@ TP CAT vs OSM es una herramienta integral basada en web para analizar y comparar
 - **Informaciones sobre Herramientas**: Sugerencias e instrucciones útiles
 - **Retroalimentación de Estado**: Indicadores de carga y mensajes de error
 
-## 🛠 Stack Técnico
+## � Gestión de Carpetas GTFS
+
+### Añadir Nuevos Conjuntos de Datos GTFS
+
+La aplicación soporta múltiples conjuntos de datos GTFS. Para añadir un nuevo conjunto de datos GTFS:
+
+1. **Crear la carpeta**: Añade tu nueva carpeta GTFS al directorio del proyecto. El nombre de la carpeta debe empezar con `gtfs_` (ej: `gtfs_barcelona`, `gtfs_madrid`).
+
+2. **Añadir archivos GTFS**: Coloca los archivos GTFS requeridos dentro de la carpeta:
+   - `stops.txt` - Información de paradas de autobús
+   - `routes.txt` - Información de rutas
+   - `trips.txt` - Horarios de viajes
+   - `shapes.txt` - Formas de rutas (opcional)
+   - `stop_times.txt` - Tiempos de parada (opcional)
+
+3. **Actualizar la configuración**: Edita el archivo `gtfs-folder-manager.js` y añade el nombre de tu carpeta al array `knownGtfsFolders`:
+   ```javascript
+   const knownGtfsFolders = [
+       'gtfs_amb_bus',
+       'gtfs_zaragoza',
+       'gtfs_barcelona',  // Añade tu nueva carpeta aquí
+       'gtfs_madrid',     // Y aquí
+   ];
+   ```
+
+4. **Usar el selector**:
+   - Abre la aplicación web
+   - Usa el desplegable "GTFS Data Folder" en el panel de controles
+   - Selecciona tu nueva carpeta
+   - La aplicación cargará automáticamente los datos de la carpeta seleccionada
+
+### Estructura de Archivos de Ejemplo
+```
+analisitpcatosm/
+├── gtfs_amb_bus/          # Carpeta existente
+│   ├── stops.txt
+│   ├── routes.txt
+│   ├── trips.txt
+│   └── shapes.txt
+├── gtfs_zaragoza/         # Carpeta existente
+│   ├── stops.txt
+│   ├── routes.txt
+│   ├── trips.txt
+│   └── shapes.txt
+├── gtfs_barcelona/        # Tu nueva carpeta
+│   ├── stops.txt
+│   ├── routes.txt
+│   ├── trips.txt
+│   └── shapes.txt
+└── gtfs-folder-manager.js # Archivo de configuración
+```
+
+### Consejos
+- El nombre de la carpeta debe empezar con `gtfs_`
+- Todos los archivos GTFS deben estar en formato GTFS estándar
+- La aplicación validará la accesibilidad de la carpeta automáticamente
+- Puedes cambiar entre conjuntos de datos usando el desplegable sin recargar la página
+
+## � Stack Técnico
 
 ### Frontend
 - **HTML5**: Estructura semántica y accesibilidad
@@ -511,6 +569,64 @@ TP CAT vs OSM és una eina integral basada en web per analitzar i comparar dades
 - **Navegació per Icones**: Disseny de botons intuïtiu basat en icones
 - **Informacions sobre Eines**: Suggeriments i instruccions útils
 - **Retroalimentació d'Estat**: Indicadors de càrrega i missatges d'error
+
+## 📁 Gestió de Carpetes GTFS
+
+### Afegir Nous Conjunts de Dades GTFS
+
+L'aplicació suporta múltiples conjunts de dades GTFS. Per afegir un nou conjunt de dades GTFS:
+
+1. **Crear la carpeta**: Afegeix la teva nova carpeta GTFS al directori del projecte. El nom de la carpeta ha de començar amb `gtfs_` (ex: `gtfs_barcelona`, `gtfs_madrid`).
+
+2. **Afegir arxius GTFS**: Col·loca els arxius GTFS requerits dins de la carpeta:
+   - `stops.txt` - Informació de parades d'autobús
+   - `routes.txt` - Informació de rutes
+   - `trips.txt` - Horaris de viatges
+   - `shapes.txt` - Formes de rutes (opcional)
+   - `stop_times.txt` - Temps de parada (opcional)
+
+3. **Actualitzar la configuració**: Edita l'arxiu `gtfs-folder-manager.js` i afegeix el nom de la teva carpeta a l'array `knownGtfsFolders`:
+   ```javascript
+   const knownGtfsFolders = [
+       'gtfs_amb_bus',
+       'gtfs_zaragoza',
+       'gtfs_barcelona',  // Afegeix la teva nova carpeta aquí
+       'gtfs_madrid',     // I aquí
+   ];
+   ```
+
+4. **Utilitzar el selector**:
+   - Obre l'aplicació web
+   - Usa el desplegable "GTFS Data Folder" al panell de controls
+   - Selecciona la teva nova carpeta
+   - L'aplicació carregarà automàticament les dades de la carpeta seleccionada
+
+### Estructura d'Arxius d'Exemple
+```
+analisitpcatosm/
+├── gtfs_amb_bus/          # Carpeta existent
+│   ├── stops.txt
+│   ├── routes.txt
+│   ├── trips.txt
+│   └── shapes.txt
+├── gtfs_zaragoza/         # Carpeta existent
+│   ├── stops.txt
+│   ├── routes.txt
+│   ├── trips.txt
+│   └── shapes.txt
+├── gtfs_barcelona/        # La teva nova carpeta
+│   ├── stops.txt
+│   ├── routes.txt
+│   ├── trips.txt
+│   └── shapes.txt
+└── gtfs-folder-manager.js # Arxiu de configuració
+```
+
+### Consells
+- El nom de la carpeta ha de començar amb `gtfs_`
+- Tots els arxius GTFS han d'estar en format GTFS estàndard
+- L'aplicació validarà l'accessibilitat de la carpeta automàticament
+- Pots canviar entre conjunts de dades usant el desplegable sense recarregar la pàgina
 
 ## 🛠 Stack Tècnic
 

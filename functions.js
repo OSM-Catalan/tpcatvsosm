@@ -12,105 +12,6 @@ let lastSidebarScrollPosition = 0;
 // Global variable to store Nominatim bbox
 let nominatimBbox = null;
 
-// Global variable to store current GTFS folder
-window.currentGtfsFolder = 'gtfs_amb_bus'; // Default folder
-
-// Load GTFS folders starting with 'gtfs'
-async function loadGtfsFolders() {
-    try {
-        // Get the dropdown element
-        const dropdown = document.getElementById('gtfs-folder-select');
-        if (!dropdown) {
-            console.error('GTFS folder dropdown not found');
-            return;
-        }
-        
-        // Since we can't directly scan directories in browser, we'll use a predefined list
-        // In a real implementation, this would be provided by the server
-        const knownGtfsFolders = [
-            'gtfs_amb_bus',
-            'gtfs_zaragoza',
-            // Add more GTFS folders as needed
-        ];
-        
-        // For now, just use all known folders since HEAD requests might fail due to CORS
-        const availableFolders = [...knownGtfsFolders];
-        
-        // Try to detect if folders exist by attempting to fetch a common file (optional)
-        for (let i = availableFolders.length - 1; i >= 0; i--) {
-            try {
-                const response = await fetch(`${availableFolders[i]}/stops.txt`, { method: 'HEAD' });
-                if (!response.ok) {
-                    console.log(`Folder ${availableFolders[i]} not accessible via HEAD, but keeping in list`);
-                }
-            } catch (e) {
-                console.log(`Folder ${availableFolders[i]} HEAD request failed, but keeping in list`);
-            }
-        }
-        
-        // Populate the dropdown
-        dropdown.innerHTML = '<option value="">Select GTFS folder...</option>';
-        availableFolders.forEach(folder => {
-            const option = document.createElement('option');
-            option.value = folder;
-            option.textContent = folder;
-            if (folder === window.currentGtfsFolder) {
-                option.selected = true;
-            }
-            dropdown.appendChild(option);
-        });
-        
-        console.log('Available GTFS folders:', availableFolders);
-    } catch (error) {
-        console.error('Error loading GTFS folders:', error);
-        
-        // Fallback: at least populate with the default folder
-        const dropdown = document.getElementById('gtfs-folder-select');
-        if (dropdown) {
-            dropdown.innerHTML = '<option value="">Select GTFS folder...</option>';
-            const option = document.createElement('option');
-            option.value = 'gtfs_amb_bus';
-            option.textContent = 'gtfs_amb_bus';
-            option.selected = true;
-            dropdown.appendChild(option);
-        }
-    }
-}
-
-// Get current GTFS folder path
-function getGtfsPath(filename) {
-    return `${window.currentGtfsFolder}/${filename}`;
-}
-
-// Initialize GTFS folder dropdown immediately (synchronous version)
-function initializeGtfsFolderDropdown() {
-    const dropdown = document.getElementById('gtfs-folder-select');
-    if (!dropdown) {
-        console.error('GTFS folder dropdown not found during initialization');
-        return;
-    }
-    
-    // Populate with known folders immediately
-    const knownGtfsFolders = [
-        'gtfs_amb_bus',
-        'gtfs_zaragoza',
-        // Add more GTFS folders as needed
-    ];
-    
-    dropdown.innerHTML = '<option value="">Select GTFS folder...</option>';
-    knownGtfsFolders.forEach(folder => {
-        const option = document.createElement('option');
-        option.value = folder;
-        option.textContent = folder;
-        if (folder === window.currentGtfsFolder) {
-            option.selected = true;
-        }
-        dropdown.appendChild(option);
-    });
-    
-    console.log('GTFS folder dropdown initialized with:', knownGtfsFolders);
-}
-
 // Perform Nominatim search to get location bbox
 async function performNominatimSearch(query) {
     try {
@@ -948,29 +849,58 @@ async function loadOsmStops() {
     }
     
     const bboxCoords = `${south},${west},${north},${east}`;
-    const query = `
+    const transportMode = document.getElementById('transport-mode-select').value;
+    
+    // Define all public transport modes from OSM wiki
+    const transportModes = {
+        all: ['bus', 'tram', 'train', 'subway', 'light_rail', 'monorail', 'trolleybus', 'ferry', 'cable_car', 'gondola', 'funicular'],
+        bus: ['bus'],
+        tram: ['tram'],
+        train: ['train'],
+        subway: ['subway'],
+        light_rail: ['light_rail'],
+        monorail: ['monorail'],
+        trolleybus: ['trolleybus'],
+        ferry: ['ferry'],
+        cable_car: ['cable_car'],
+        gondola: ['gondola'],
+        funicular: ['funicular']
+    };
+    
+    const modesToQuery = transportModes[transportMode];
+    
+    // Build query for all relevant stop types
+    let query = `
         [out:json][timeout:45][maxsize:1048576];
         (
             node["highway"="bus_stop"](${bboxCoords});
             way["highway"="bus_stop"](${bboxCoords});
             relation["highway"="bus_stop"](${bboxCoords});
-            node["public_transport"="platform"]["bus"="yes"](${bboxCoords});
-            way["public_transport"="platform"]["bus"="yes"](${bboxCoords});
-            relation["public_transport"="platform"]["bus"="yes"](${bboxCoords});
-            node["public_transport"="platform"]["route"="bus"](${bboxCoords});
-            way["public_transport"="platform"]["route"="bus"](${bboxCoords});
-            relation["public_transport"="platform"]["route"="bus"](${bboxCoords});
+            node["public_transport"="stop_position"](${bboxCoords});
+            way["public_transport"="stop_position"](${bboxCoords});
+            relation["public_transport"="stop_position"](${bboxCoords});
+    `;
+    
+    // Add platform queries for each transport mode
+    modesToQuery.forEach(mode => {
+        query += `
+            node["public_transport"="platform"]["${mode}"="yes"](${bboxCoords});
+            way["public_transport"="platform"]["${mode}"="yes"](${bboxCoords});
+            relation["public_transport"="platform"]["${mode}"="yes"](${bboxCoords});
+            node["public_transport"="platform"]["route"="${mode}"](${bboxCoords});
+            way["public_transport"="platform"]["route"="${mode}"](${bboxCoords});
+            relation["public_transport"="platform"]["route"="${mode}"](${bboxCoords});
+        `;
+    });
+    
+    query += `
         );
         out;
     `;
 
     try {
-        // Try multiple Overpass servers in order of preference
-        const servers = [
-            'https://z.overpass-api.de/api/interpreter',
-            'https://overpass.kumi.systems/api/interpreter',
-            'https://overpass-api.de/api/interpreter'
-        ];
+        // Get selected servers
+        const servers = getOverpassServers();
 
         let response;
         for (const server of servers) {
@@ -1618,11 +1548,16 @@ function getStopsForRoute(routeId) {
     return stops;
 }
 function loadGtfsStopsForRoute(routeId) {
+    console.log('Loading GTFS stops for route ID:', routeId);
+    console.log('Current GTFS folder:', window.currentGtfsFolder);
+    
     const routeStops = getStopsForRoute(routeId);
     if (routeStops.length === 0) {
-        alert('No GTFS stops found for this route.');
+        console.log('No GTFS stops found for route:', routeId);
         return;
     }
+
+    console.log(`Found ${routeStops.length} GTFS stops for route ${routeId}`);
 
     // Don't clear existing GTFS stops layer - just add to it
     // This allows accumulating stops from multiple routes
@@ -1731,12 +1666,8 @@ async function loadOsmStopsForRoute(route) {
     `;
 
     try {
-        // Try multiple Overpass servers
-        const servers = [
-            'https://z.overpass-api.de/api/interpreter',
-            'https://overpass.kumi.systems/api/interpreter',
-            'https://overpass-api.de/api/interpreter'
-        ];
+        // Get selected servers
+        const servers = getOverpassServers();
 
         let response;
         for (const server of servers) {
@@ -1888,12 +1819,8 @@ async function loadRouteGeometry(routeId) {
     `;
 
     try {
-        // Try multiple Overpass servers
-        const servers = [
-            'https://z.overpass-api.de/api/interpreter',
-            'https://overpass.kumi.systems/api/interpreter',
-            'https://overpass-api.de/api/interpreter'
-        ];
+        // Get selected servers
+        const servers = getOverpassServers();
 
         let response;
         for (const server of servers) {
@@ -2002,12 +1929,8 @@ function openOsmTrackOverpass(route) {
         out geom;
     `;
 
-    // Try multiple Overpass servers
-    const servers = [
-        'https://z.overpass-api.de/api/interpreter',
-        'https://overpass.kumi.systems/api/interpreter',
-        'https://overpass-api.de/api/interpreter'
-    ];
+    // Get selected servers
+    const servers = getOverpassServers();
 
     async function loadOsmTrack() {
         try {
@@ -2543,18 +2466,67 @@ async function loadOsmStopsForIdaDirection(route) {
     const east = bounds.getEast();
     const bboxCoords = `${south},${west},${north},${east}`;
 
-    // AMB (Àrea Metropolitana de Barcelona) bounding box
-    const ambBbox = "41.27,1.92,41.5,2.27"; // south,west,north,east
+    // Use Nominatim bbox if available, otherwise use current map bounds
+    let queryBbox;
+    if (nominatimBbox) {
+        queryBbox = `${nominatimBbox.south},${nominatimBbox.west},${nominatimBbox.north},${nominatimBbox.east}`;
+        console.log('Using Nominatim bbox for OSM route stops:', queryBbox);
+    } else {
+        queryBbox = bboxCoords;
+        console.log('Using current map bounds for OSM route stops:', queryBbox);
+    }
 
-    // Query route relation and get its member stops within AMB bounding box
-    const query = `
+    const transportMode = document.getElementById('transport-mode-select').value;
+    
+    // Define all public transport modes from OSM wiki
+    const transportModes = {
+        all: ['bus', 'tram', 'train', 'subway', 'light_rail', 'monorail', 'trolleybus', 'ferry', 'cable_car', 'gondola', 'funicular'],
+        bus: ['bus'],
+        tram: ['tram'],
+        train: ['train'],
+        subway: ['subway'],
+        light_rail: ['light_rail'],
+        monorail: ['monorail'],
+        trolleybus: ['trolleybus'],
+        ferry: ['ferry'],
+        cable_car: ['cable_car'],
+        gondola: ['gondola'],
+        funicular: ['funicular']
+    };
+    
+    const modesToQuery = transportModes[transportMode];
+    
+    // Build query for route relations based on selected transport modes
+    let query = `
         [out:json][timeout:60];
         (
-            relation["type"="route"]["route"="bus"]["ref"="${route.shortName}"](${ambBbox});
+    `;
+    
+    modesToQuery.forEach(mode => {
+        query += `
+            relation["type"="route"]["route"="${mode}"]["ref"="${route.shortName}"](${queryBbox});
+        `;
+    });
+    
+    query += `
         );
         node(r)->.stops;
-        node.stops["highway"="bus_stop"];
+    `;
+    
+    // Add appropriate stop filters based on transport mode
+    if (transportMode === 'all' || transportMode === 'bus') {
+        query += `
+            node.stops["highway"="bus_stop"];
+        `;
+    }
+    
+    // Add public transport stop filters for all modes
+    query += `
         node.stops["public_transport"="stop_position"];
+        node.stops["public_transport"="platform"];
+    `;
+    
+    query += `
         out center meta;
     `;
 
@@ -2562,11 +2534,8 @@ async function loadOsmStopsForIdaDirection(route) {
         console.log('Debug - Route shortName:', route.shortName);
         console.log('Debug - Query:', query);
         
-        // Try primary server first, then fallback with delays
-        const servers = [
-            'https://overpass-api.de/api/interpreter',
-            'https://z.overpass-api.de/api/interpreter'
-        ];
+        // Get selected servers
+        const servers = getOverpassServers();
 
         let response;
         for (let i = 0; i < servers.length; i++) {
@@ -3701,10 +3670,768 @@ async function loadGtfsDataAndPopulateLines() {
     }
 }
 
-// Populate sidebar with lines list
+// Get selected Overpass server or fallback list
+function getOverpassServers() {
+    const selectedServer = document.getElementById('overpass-server-select').value;
+    
+    if (selectedServer === 'fallback') {
+        return [
+            'https://overpass-api.de/api/interpreter',
+            'https://overpass.kumi.systems/api/interpreter',
+            'https://z.overpass-api.de/api/interpreter'
+        ];
+    } else {
+        return [selectedServer];
+    }
+}
+
+// Fetch all OSM lines in the Nominatim zone
+async function fetchAllOsmLinesInZone() {
+    if (!nominatimBbox) {
+        alert('Please select a zone using Nominatim search first.');
+        return;
+    }
+
+    const transportMode = document.getElementById('transport-mode-select').value;
+    
+    // Define all public transport modes from OSM wiki
+    const transportModes = {
+        all: ['bus', 'tram', 'train', 'subway', 'light_rail', 'monorail', 'trolleybus', 'ferry', 'cable_car', 'gondola', 'funicular'],
+        bus: ['bus'],
+        tram: ['tram'],
+        train: ['train'],
+        subway: ['subway'],
+        light_rail: ['light_rail'],
+        monorail: ['monorail'],
+        trolleybus: ['trolleybus'],
+        ferry: ['ferry'],
+        cable_car: ['cable_car'],
+        gondola: ['gondola'],
+        funicular: ['funicular']
+    };
+    
+    const modesToQuery = transportModes[transportMode];
+    const bboxCoords = `${nominatimBbox.south},${nominatimBbox.west},${nominatimBbox.north},${nominatimBbox.east}`;
+    
+    // Build query to get all route relations
+    let query = `
+        [out:json][timeout:60];
+        (
+    `;
+    
+    modesToQuery.forEach(mode => {
+        query += `
+            relation["type"="route"]["route"="${mode}"](${bboxCoords});
+        `;
+    });
+    
+    query += `
+        );
+        out meta;
+    `;
+
+    try {
+        console.log('Fetching all OSM lines in zone with transport mode:', transportMode);
+        console.log('Query:', query);
+        
+        // Show loading indicator
+        const stopsList = document.getElementById('stops-list');
+        
+        // Remove any existing OSM section first
+        const existingOsmSection = stopsList.querySelector('div[style*="border: 2px solid #007cba"]');
+        if (existingOsmSection) {
+            existingOsmSection.remove();
+        }
+        stopsList.innerHTML = '<h3>Bus Lines</h3><p>🔄 Fetching OSM lines...</p>';
+        
+        // Get selected servers
+        const servers = getOverpassServers();
+        let data = null;
+        let lastError = null;
+        
+        for (let i = 0; i < servers.length; i++) {
+            try {
+                console.log(`Trying server ${i + 1}/${servers.length}: ${servers[i]}`);
+                
+                const response = await fetch(servers[i], {
+                    method: 'POST',
+                    body: query,
+                    timeout: 30000 // 30 second timeout
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Server ${i + 1} error: ${response.status} ${response.statusText}`);
+                }
+                
+                data = await response.json();
+                console.log(`Success with server ${i + 1}`);
+                break;
+                
+            } catch (error) {
+                lastError = error;
+                console.warn(`Server ${i + 1} failed:`, error.message);
+                
+                // If this is not the last server, continue to next one
+                if (i < servers.length - 1) {
+                    console.log('Trying next server...');
+                    // Add a small delay before retrying
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
+        }
+        
+        if (!data) {
+            throw lastError || new Error('All Overpass servers failed');
+        }
+        
+        console.log('Found OSM routes:', data.elements.length);
+        
+        // Restore GTFS content properly with event listeners
+        populateSidebarWithLines();
+        
+        // Display OSM lines with action buttons
+        displayOsmLinesWithButtons(data.elements);
+        
+    } catch (error) {
+        console.error('Error fetching OSM lines:', error);
+        alert('Error fetching OSM lines: ' + error.message);
+        
+        // Restore GTFS content properly with event listeners
+        populateSidebarWithLines();
+    }
+}
+
+// Load all OSM tracks to the map
+async function loadAllOsmTracks(osmRoutes) {
+    try {
+        console.log(`Loading ${osmRoutes.length} OSM tracks to map...`);
+        
+        // Show loading indicator
+        const loadAllBtn = document.querySelector('button[textContent*="Load All Tracks"]');
+        if (loadAllBtn) {
+            loadAllBtn.textContent = '🔄 Loading...';
+            loadAllBtn.disabled = true;
+        }
+        
+        // Create a layer group for all tracks
+        const allTracksLayer = L.layerGroup();
+        let loadedCount = 0;
+        let errorCount = 0;
+        
+        // Load tracks in batches to avoid overwhelming the server
+        const batchSize = 3;
+        for (let i = 0; i < osmRoutes.length; i += batchSize) {
+            const batch = osmRoutes.slice(i, i + batchSize);
+            
+            const promises = batch.map(async (route) => {
+                try {
+                    const query = `
+                        [out:json][timeout:45];
+                        relation(${route.id});
+                        (._;>>;);
+                        out geom;
+                    `;
+                    
+                    const servers = getOverpassServers();
+                    let data = null;
+                    let lastError = null;
+                    
+                    for (let j = 0; j < servers.length; j++) {
+                        try {
+                            const response = await fetch(servers[j], {
+                                method: 'POST',
+                                body: query,
+                                timeout: 30000
+                            });
+                            
+                            if (response.ok) {
+                                data = await response.json();
+                                break;
+                            }
+                        } catch (error) {
+                            lastError = error;
+                        }
+                    }
+                    
+                    if (data) {
+                        // Process ways to create polylines
+                        const ways = {};
+                        data.elements.forEach(element => {
+                            if (element.type === 'way') {
+                                ways[element.id] = element;
+                            }
+                        });
+                        
+                        // Draw the route geometry with different colors
+                        const colors = ['#007cba', '#28a745', '#dc3545', '#ffc107', '#6f42c1', '#fd7e14'];
+                        const colorIndex = loadedCount % colors.length;
+                        
+                        Object.values(ways).forEach(way => {
+                            if (way.geometry && way.geometry.length > 1) {
+                                const latLngs = way.geometry.map(point => [point.lat, point.lon]);
+                                const polyline = L.polyline(latLngs, {
+                                    color: colors[colorIndex],
+                                    weight: 3,
+                                    opacity: 0.8
+                                }).bindPopup(`
+                                    <b>OSM Route: ${route.tags.ref || 'Unknown'}</b><br>
+                                    Name: ${route.tags.name || 'N/A'}<br>
+                                    Type: ${route.tags.route}<br>
+                                    <a href="https://www.openstreetmap.org/relation/${route.id}" target="_blank">View in OSM</a>
+                                `);
+                                
+                                allTracksLayer.addLayer(polyline);
+                            }
+                        });
+                        
+                        loadedCount++;
+                        console.log(`Loaded track for route ${route.tags.ref || route.id}`);
+                    } else {
+                        errorCount++;
+                        console.warn(`Failed to load track for route ${route.tags.ref || route.id}`);
+                    }
+                } catch (error) {
+                    errorCount++;
+                    console.error(`Error loading track for route ${route.tags.ref || route.id}:`, error);
+                }
+            });
+            
+            await Promise.all(promises);
+            
+            // Add small delay between batches
+            if (i + batchSize < osmRoutes.length) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+        
+        // Add all tracks to the map
+        allTracksLayer.addTo(map);
+        
+        // Fit map to all tracks bounds
+        if (allTracksLayer.getBounds && allTracksLayer.getBounds().isValid()) {
+            map.fitBounds(allTracksLayer.getBounds(), { padding: [50, 50] });
+        }
+        
+        // Update button
+        if (loadAllBtn) {
+            loadAllBtn.textContent = `✅ Loaded ${loadedCount} tracks${errorCount > 0 ? ` (${errorCount} errors)` : ''}`;
+            setTimeout(() => {
+                loadAllBtn.textContent = '📍 Load All Tracks to Map';
+                loadAllBtn.disabled = false;
+            }, 3000);
+        }
+        
+        console.log(`Successfully loaded ${loadedCount} OSM tracks to map (${errorCount} errors)`);
+        
+    } catch (error) {
+        console.error('Error loading all OSM tracks:', error);
+        
+        // Reset button
+        const loadAllBtn = document.querySelector('button[textContent*="Loading"]');
+        if (loadAllBtn) {
+            loadAllBtn.textContent = '❌ Error loading tracks';
+            setTimeout(() => {
+                loadAllBtn.textContent = '📍 Load All Tracks to Map';
+                loadAllBtn.disabled = false;
+            }, 3000);
+        }
+        
+        alert('Error loading tracks: ' + error.message);
+    }
+}
+
+// Display OSM lines with action buttons
+function displayOsmLinesWithButtons(osmRoutes) {
+    const stopsList = document.getElementById('stops-list');
+    
+    // Create a section for OSM lines
+    const osmSection = document.createElement('div');
+    osmSection.style.marginTop = '20px';
+    osmSection.style.padding = '15px';
+    osmSection.style.border = '2px solid #007cba';
+    osmSection.style.borderRadius = '8px';
+    osmSection.style.backgroundColor = '#f8f9fa';
+    
+    const osmTitle = document.createElement('h4');
+    osmTitle.textContent = `🚌 OSM Lines Found (${osmRoutes.length})`;
+    osmTitle.style.marginBottom = '15px';
+    osmTitle.style.color = '#007cba';
+    osmSection.appendChild(osmTitle);
+    
+    if (osmRoutes.length === 0) {
+        const noRoutes = document.createElement('p');
+        noRoutes.textContent = 'No OSM routes found in this zone for the selected transport mode.';
+        noRoutes.style.color = '#6c757d';
+        osmSection.appendChild(noRoutes);
+    } else {
+        // Add "Load All Tracks" button
+        const loadAllBtn = document.createElement('button');
+        loadAllBtn.textContent = '📍 Load All Tracks to Map';
+        loadAllBtn.style.marginBottom = '15px';
+        loadAllBtn.style.padding = '10px 15px';
+        loadAllBtn.style.backgroundColor = '#007cba';
+        loadAllBtn.style.color = 'white';
+        loadAllBtn.style.border = 'none';
+        loadAllBtn.style.borderRadius = '5px';
+        loadAllBtn.style.cursor = 'pointer';
+        loadAllBtn.style.fontSize = '14px';
+        loadAllBtn.style.width = '100%';
+        loadAllBtn.addEventListener('click', () => {
+            loadAllOsmTracks(osmRoutes);
+        });
+        osmSection.appendChild(loadAllBtn);
+        
+        // Sort routes by ref (line number)
+        osmRoutes.sort((a, b) => {
+            const refA = a.tags.ref || '';
+            const refB = b.tags.ref || '';
+            return refA.localeCompare(refB);
+        });
+        
+        osmRoutes.forEach(route => {
+            const routeContainer = document.createElement('div');
+            routeContainer.style.marginBottom = '12px';
+            routeContainer.style.padding = '8px';
+            routeContainer.style.border = '1px solid #dee2e6';
+            routeContainer.style.borderRadius = '4px';
+            routeContainer.style.backgroundColor = 'white';
+            
+            const routeInfo = document.createElement('div');
+            routeInfo.style.fontWeight = 'bold';
+            routeInfo.style.marginBottom = '5px';
+            
+            const ref = route.tags.ref || 'Unknown';
+            const name = route.tags.name || '';
+            const routeType = route.tags.route || '';
+            
+            routeInfo.textContent = `${ref}: ${name}`;
+            routeInfo.style.color = '#007cba';
+            routeContainer.appendChild(routeInfo);
+            
+            // Add transport mode badge
+            const modeBadge = document.createElement('span');
+            modeBadge.textContent = routeType;
+            modeBadge.style.fontSize = '10px';
+            modeBadge.style.padding = '2px 6px';
+            modeBadge.style.backgroundColor = '#e9ecef';
+            modeBadge.style.borderRadius = '3px';
+            modeBadge.style.marginRight = '5px';
+            routeInfo.appendChild(modeBadge);
+            
+            // Buttons container
+            const buttonsContainer = document.createElement('div');
+            buttonsContainer.style.display = 'flex';
+            buttonsContainer.style.gap = '5px';
+            buttonsContainer.style.marginTop = '8px';
+            
+            // OSM Track button
+            const trackButton = document.createElement('button');
+            trackButton.textContent = '📍 OSM Track';
+            trackButton.style.fontSize = '10px';
+            trackButton.style.padding = '3px 6px';
+            trackButton.style.backgroundColor = '#007cba';
+            trackButton.style.color = 'white';
+            trackButton.style.border = 'none';
+            trackButton.style.borderRadius = '3px';
+            trackButton.style.cursor = 'pointer';
+            trackButton.addEventListener('click', () => {
+                loadOsmTrackGeometry(route);
+            });
+            
+            // OSM Stops button
+            const stopsButton = document.createElement('button');
+            stopsButton.textContent = '🚏 OSM Stops';
+            stopsButton.style.fontSize = '10px';
+            stopsButton.style.padding = '3px 6px';
+            stopsButton.style.backgroundColor = '#28a745';
+            stopsButton.style.color = 'white';
+            stopsButton.style.border = 'none';
+            stopsButton.style.borderRadius = '3px';
+            stopsButton.style.cursor = 'pointer';
+            stopsButton.addEventListener('click', () => {
+                loadOsmStopsForRoute(route);
+            });
+            
+            buttonsContainer.appendChild(trackButton);
+            buttonsContainer.appendChild(stopsButton);
+            routeContainer.appendChild(buttonsContainer);
+            osmSection.appendChild(routeContainer);
+        });
+    }
+    
+    // Add close button
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✖ Close OSM Lines';
+    closeBtn.style.marginTop = '15px';
+    closeBtn.style.padding = '8px 12px';
+    closeBtn.style.backgroundColor = '#dc3545';
+    closeBtn.style.color = 'white';
+    closeBtn.style.border = 'none';
+    closeBtn.style.borderRadius = '4px';
+    closeBtn.style.cursor = 'pointer';
+    closeBtn.style.fontSize = '12px';
+    closeBtn.addEventListener('click', () => {
+        osmSection.remove();
+    });
+    osmSection.appendChild(closeBtn);
+    
+    stopsList.appendChild(osmSection);
+}
+
+// Load OSM track geometry for a specific route
+async function loadOsmTrackGeometry(route) {
+    try {
+        if (!route) {
+            console.error('Route parameter is undefined in loadOsmTrackGeometry');
+            return;
+        }
+        
+        const routeRef = route.tags?.ref || route.id || 'Unknown';
+        console.log('Loading OSM track geometry for route:', routeRef);
+        
+        const query = `
+            [out:json][timeout:45];
+            relation(${route.id});
+            (._;>>;);
+            out geom;
+        `;
+        
+        // Get selected servers
+        const servers = getOverpassServers();
+        let data = null;
+        let lastError = null;
+        
+        for (let i = 0; i < servers.length; i++) {
+            try {
+                console.log(`Trying server ${i + 1}/${servers.length}: ${servers[i]}`);
+                
+                const response = await fetch(servers[i], {
+                    method: 'POST',
+                    body: query,
+                    timeout: 30000 // 30 second timeout
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Server ${i + 1} error: ${response.status} ${response.statusText}`);
+                }
+                
+                data = await response.json();
+                console.log(`Success with server ${i + 1}`);
+                break;
+                
+            } catch (error) {
+                lastError = error;
+                console.warn(`Server ${i + 1} failed:`, error.message);
+                
+                // If this is not the last server, continue to next one
+                if (i < servers.length - 1) {
+                    console.log('Trying next server...');
+                    // Add a small delay before retrying
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
+        }
+        
+        if (!data) {
+            throw lastError || new Error('All Overpass servers failed');
+        }
+        
+        // Create a new layer for this route
+        const routeLayer = L.layerGroup();
+        
+        // Process ways to create polylines
+        const ways = {};
+        data.elements.forEach(element => {
+            if (element.type === 'way') {
+                ways[element.id] = element;
+            }
+        });
+        
+        // Draw the route geometry
+        Object.values(ways).forEach(way => {
+            if (way.geometry && way.geometry.length > 1) {
+                const latLngs = way.geometry.map(point => [point.lat, point.lon]);
+                const polyline = L.polyline(latLngs, {
+                    color: '#007cba',
+                    weight: 4,
+                    opacity: 0.8
+                }).bindPopup(`
+                    <b>OSM Route: ${routeRef}</b><br>
+                    Name: ${route.tags?.name || 'N/A'}<br>
+                    Type: ${route.tags?.route || 'N/A'}<br>
+                    <a href="https://www.openstreetmap.org/relation/${route.id}" target="_blank">View in OSM</a>
+                `);
+                
+                routeLayer.addLayer(polyline);
+            }
+        });
+        
+        // Add the layer to the map
+        routeLayer.addTo(map);
+        
+        // Fit map to route bounds
+        if (routeLayer.getBounds && routeLayer.getBounds().isValid()) {
+            map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
+        }
+        
+        console.log('OSM track geometry loaded successfully');
+        
+    } catch (error) {
+        console.error('Error loading OSM track geometry:', error);
+        
+        // Provide more user-friendly error messages
+        let errorMessage = 'Error loading OSM track: ';
+        
+        if (error.message.includes('504') || error.message.includes('timeout')) {
+            errorMessage += 'The Overpass server is busy or timed out. Please try again in a few moments.';
+        } else if (error.message.includes('All Overpass servers failed')) {
+            errorMessage += 'All Overpass servers are currently unavailable. Please try again later.';
+        } else {
+            errorMessage += error.message;
+        }
+        
+        alert(errorMessage);
+    }
+}
+
+// Load OSM stops for a specific route
+async function loadOsmStopsForRoute(route) {
+    try {
+        if (!route) {
+            console.error('Route parameter is undefined');
+            return;
+        }
+        
+        const routeRef = route.tags?.ref || route.id || 'Unknown';
+        console.log('Loading OSM stops for route:', routeRef);
+        
+        // Get transport mode to adjust stop filters
+        const transportMode = document.getElementById('transport-mode-select').value;
+        
+        let stopFilters = `
+            node.stops["highway"="bus_stop"];
+            node.stops["public_transport"="stop_position"];
+            node.stops["public_transport"="platform"];
+        `;
+        
+        // Add tram-specific filters if tram mode is selected
+        if (transportMode === 'tram' || transportMode === 'all') {
+            stopFilters += `
+                node.stops["highway"="tram_stop"];
+                node.stops["railway"="tram_stop"];
+                node.stops["tram"="yes"];
+                node.stops["public_transport"="platform"]["tram"="yes"];
+                node.stops["public_transport"="stop_position"]["tram"="yes"];
+            `;
+        }
+        
+        // Add train-specific filters if train mode is selected
+        if (transportMode === 'train' || transportMode === 'subway' || transportMode === 'all') {
+            stopFilters += `
+                node.stops["railway"="station"];
+                node.stops["railway"="halt"];
+                node.stops["railway"="tram_stop"];
+                node.stops["public_transport"="platform"]["train"="yes"];
+                node.stops["public_transport"="stop_position"]["train"="yes"];
+            `;
+        }
+        
+        const query = `
+            [out:json][timeout:45];
+            relation(${route.id});
+            node(r)->.stops;
+            ${stopFilters}
+            out center meta;
+        `;
+        
+        console.log('OSM stops query for route:', routeRef, 'Transport mode:', transportMode);
+        console.log('Query:', query);
+        
+        // Get selected servers
+        const servers = getOverpassServers();
+        let data = null;
+        let lastError = null;
+        
+        for (let i = 0; i < servers.length; i++) {
+            try {
+                console.log(`Trying server ${i + 1}/${servers.length}: ${servers[i]}`);
+                
+                const response = await fetch(servers[i], {
+                    method: 'POST',
+                    body: query,
+                    timeout: 30000 // 30 second timeout
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Server ${i + 1} error: ${response.status} ${response.statusText}`);
+                }
+                
+                data = await response.json();
+                console.log(`Success with server ${i + 1}`);
+                break;
+                
+            } catch (error) {
+                lastError = error;
+                console.warn(`Server ${i + 1} failed:`, error.message);
+                
+                // If this is not the last server, continue to next one
+                if (i < servers.length - 1) {
+                    console.log('Trying next server...');
+                    // Add a small delay before retrying
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
+        }
+        
+        if (!data) {
+            throw lastError || new Error('All Overpass servers failed');
+        }
+        
+        console.log(`Found ${data.elements.length} OSM stops for route ${routeRef}`);
+        
+        // If no stops found as relation members, try finding stops near the route geometry
+        if (data.elements.length === 0) {
+            console.log('No stops found as route members, trying proximity search...');
+            
+            // Get route bounding box for proximity search
+            const routeBboxQuery = `
+                [out:json][timeout:30];
+                relation(${route.id});
+                way(r);
+                out bb;
+            `;
+            
+            try {
+                const bboxResponse = await fetch(servers[0], {
+                    method: 'POST',
+                    body: routeBboxQuery,
+                    timeout: 15000
+                });
+                
+                if (bboxResponse.ok) {
+                    const bboxData = await bboxResponse.json();
+                    if (bboxData.elements && bboxData.elements.length > 0) {
+                        const bbox = bboxData.elements[0].bounds;
+                        const bboxCoords = `${bbox.south},${bbox.west},${bbox.north},${bbox.east}`;
+                        
+                        console.log('Searching for stops in route bbox:', bboxCoords);
+                        
+                        // Build proximity search query
+                        let proximityFilters = `
+                            node["highway"="bus_stop"](${bboxCoords});
+                            node["public_transport"="stop_position"](${bboxCoords});
+                            node["public_transport"="platform"](${bboxCoords});
+                        `;
+                        
+                        if (transportMode === 'tram' || transportMode === 'all') {
+                            proximityFilters += `
+                                node["highway"="tram_stop"](${bboxCoords});
+                                node["railway"="tram_stop"](${bboxCoords});
+                                node["tram"="yes"](${bboxCoords});
+                            `;
+                        }
+                        
+                        const proximityQuery = `
+                            [out:json][timeout:45];
+                            (
+                                ${proximityFilters}
+                            );
+                            out center meta;
+                        `;
+                        
+                        console.log('Proximity query:', proximityQuery);
+                        
+                        const proximityResponse = await fetch(servers[0], {
+                            method: 'POST',
+                            body: proximityQuery,
+                            timeout: 30000
+                        });
+                        
+                        if (proximityResponse.ok) {
+                            const proximityData = await proximityResponse.json();
+                            console.log(`Found ${proximityData.elements.length} stops near route`);
+                            data = proximityData;
+                        }
+                    }
+                }
+            } catch (error) {
+                console.warn('Proximity search failed:', error.message);
+            }
+        }
+        
+        // Create a new layer for stops
+        const stopsLayer = L.layerGroup();
+        
+        data.elements.forEach(stop => {
+            const lat = stop.lat || (stop.center && stop.center.lat);
+            const lon = stop.lon || (stop.center && stop.center.lon);
+            
+            if (lat && lon) {
+                const marker = L.circleMarker([lat, lon], {
+                    color: '#28a745',
+                    fillColor: '#28a745',
+                    fillOpacity: 0.7,
+                    radius: 8
+                }).bindPopup(`
+                    <b>OSM Stop</b><br>
+                    Name: ${stop.tags.name || 'N/A'}<br>
+                    ID: ${stop.id}<br>
+                    <a href="https://www.openstreetmap.org/node/${stop.id}" target="_blank">View in OSM</a>
+                `);
+                
+                stopsLayer.addLayer(marker);
+            }
+        });
+        
+        // Add the layer to the map
+        stopsLayer.addTo(map);
+        
+        // Fit map to stops bounds
+        if (stopsLayer.getBounds && stopsLayer.getBounds().isValid()) {
+            map.fitBounds(stopsLayer.getBounds(), { padding: [50, 50] });
+        }
+        
+        console.log(`Loaded ${data.elements.length} OSM stops for route ${routeRef}`);
+        
+    } catch (error) {
+        console.error('Error loading OSM stops:', error);
+        
+        // Provide more user-friendly error messages
+        let errorMessage = 'Error loading OSM stops: ';
+        
+        if (error.message.includes('504') || error.message.includes('timeout')) {
+            errorMessage += 'The Overpass server is busy or timed out. Please try again in a few moments.';
+        } else if (error.message.includes('All Overpass servers failed')) {
+            errorMessage += 'All Overpass servers are currently unavailable. Please try again later.';
+        } else {
+            errorMessage += error.message;
+        }
+        
+        alert(errorMessage);
+    }
+}
 function populateSidebarWithLines() {
     const stopsList = document.getElementById('stops-list');
     stopsList.innerHTML = '<h3>Bus Lines</h3>';
+    
+    // Add "Fetch All OSM Lines" button if Nominatim bbox is available
+    if (nominatimBbox) {
+        const fetchOsmLinesBtn = document.createElement('button');
+        fetchOsmLinesBtn.textContent = '🔄 Fetch All OSM Lines in Zone';
+        fetchOsmLinesBtn.style.marginBottom = '15px';
+        fetchOsmLinesBtn.style.padding = '10px 15px';
+        fetchOsmLinesBtn.style.backgroundColor = '#28a745';
+        fetchOsmLinesBtn.style.color = 'white';
+        fetchOsmLinesBtn.style.border = 'none';
+        fetchOsmLinesBtn.style.borderRadius = '5px';
+        fetchOsmLinesBtn.style.cursor = 'pointer';
+        fetchOsmLinesBtn.style.fontSize = '14px';
+        fetchOsmLinesBtn.style.width = '100%';
+        fetchOsmLinesBtn.addEventListener('click', () => {
+            fetchAllOsmLinesInZone();
+        });
+        stopsList.appendChild(fetchOsmLinesBtn);
+    }
 
     routesData.forEach(route => {
         const lineContainer = document.createElement('div');
