@@ -82,6 +82,7 @@ function initializeGtfsFolderDropdown() {
     // Populate with known folders immediately
     const knownGtfsFolders = [
         'gtfs_amb_bus',
+		'cat_bus',
         'gtfs_zaragoza',
         // Add more GTFS folders as needed
     ];
