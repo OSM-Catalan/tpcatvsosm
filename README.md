@@ -298,36 +298,6 @@ TP CAT vs OSM es una herramienta integral basada en web para analizar y comparar
 ## � Gestión de Carpetas GTFS
 
 ### Añadir Nuevos Conjuntos de Datos GTFS
-
-La aplicación soporta múltiples conjuntos de datos GTFS. Para añadir un nuevo conjunto de datos GTFS:
-
-1. **Crear la carpeta**: Añade tu nueva carpeta GTFS al directorio del proyecto. El nombre de la carpeta debe empezar con `gtfs_` (ej: `gtfs_barcelona`, `gtfs_madrid`).
-
-2. **Añadir archivos GTFS**: Coloca los archivos GTFS requeridos dentro de la carpeta:
-   - `stops.txt` - Información de paradas de autobús
-   - `routes.txt` - Información de rutas
-   - `trips.txt` - Horarios de viajes
-   - `shapes.txt` - Formas de rutas (opcional)
-   - `stop_times.txt` - Tiempos de parada (opcional)
-
-3. **Actualizar la configuración**: Edita el archivo `gtfs-folder-manager.js` y añade el nombre de tu carpeta al array `knownGtfsFolders`:
-   ```javascript
-   const knownGtfsFolders = [
-       'gtfs_amb_bus',
-       'gtfs_zaragoza',
-       'gtfs_barcelona',  // Añade tu nueva carpeta aquí
-       'gtfs_madrid',     // Y aquí
-   ];
-   ```
-
-4. **Usar el selector**:
-   - Abre la aplicación web
-   - Usa el desplegable "GTFS Data Folder" en el panel de controles
-   - Selecciona tu nueva carpeta
-   - La aplicación cargará automáticamente los datos de la carpeta seleccionada
-
-### Estructura de Archivos de Ejemplo
-```
 analisitpcatosm/
 ├── gtfs_amb_bus/          # Carpeta existente
 │   ├── stops.txt

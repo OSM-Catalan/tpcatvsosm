@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OSM Viewer</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+        #map {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100%;
+            height: 100%;
+        }
+        #controls-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            border-radius: 15px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            min-width: 300px;
+            height: auto;
+            min-height: 150px;
+            max-height: calc(100vh - 20px);
+            overflow-y: auto;
+            transition: all 0.3s ease;
+        }
+        #controls-panel.minimized {
+            width: 40px;
+            height: 40px;
+            min-width: 40px;
+            padding: 0;
+            overflow: hidden;
+        }
+        #controls-panel label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 5px;
+            display: block;
+        }
+        #controls-panel select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            background: white;
+            font-size: 14px;
+            color: #495057;
+        }
+        #controls-panel select:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+        }
+        .controls-divider {
+            height: 1px;
+            background: #dee2e6;
+            margin: 5px 0;
+        }
+        .close-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 24px;
+            height: 24px;
+            border: none;
+            background: #dc3545;
+            color: white;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+            z-index: 1001;
+            transition: all 0.2s ease;
+        }
+        .close-btn:hover {
+            background: #c82333;
+            transform: scale(1.1);
+        }
+        .minimized .close-btn {
+            top: 8px;
+            right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls-panel">
+        <div>
+            <label for="search-input">Search Place</label>
+            <input type="text" id="search-input" placeholder="Search for places..." oninput="searchPlaces(this.value)">
+            <div id="search-results"></div>
+        </div>
+        <div class="controls-divider"></div>
+        <div>
+            <label for="transport-type">Public Transport Type Stops</label>
+            <select id="transport-type">
+                <option value="bus_stop">Bus Stop</option>
+                <option value="tram_stop">Tram Stop</option>
+                <option value="subway_entrance">Subway Entrance</option>
+                <option value="railway_station">Railway Station</option>
+                <option value="ferry_terminal">Ferry Terminal</option>
+                <option value="platform">Platform</option>
+                <option value="stop_position">Stop Position</option>
+                <option value="halt">Railway Halt</option>
+                <option value="monorail_stop">Monorail Stop</option>
+                <option value="light_rail_stop">Light Rail Stop</option>
+                <option value="funicular_stop">Funicular Stop</option>
+                <option value="all">All transports</option>
+            </select>
+            <button onclick="fetchTransportInView()" style="margin-top: 10px; padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">Fetch in View</button>
+        </div>
+        <div>
+            <label for="overpass-server">Overpass Server</label>
+            <select id="overpass-server">
+                <option value="https://overpass-api.de/api/interpreter">overpass-api.de</option>
+                <option value="https://overpass.kumi.systems/api/interpreter">overpass.kumi.systems</option>
+                <option value="https://overpass.osm-fr.org/api/interpreter">overpass.osm-fr.org</option>
+            </select>
+            <label for="query-timeout">Timeout (ms)</label>
+            <input type="number" id="query-timeout" value="30000" min="1000" max="60000">
+        </div>
+        <div class="controls-divider"></div>
+        <div>
+            <label for="route-type">Route Type</label>
+            <select id="route-type">
+                <option value="bus">Bus</option>
+                <option value="tram">Tram</option>
+                <option value="train">Train</option>
+                <option value="subway">Subway</option>
+                <option value="light_rail">Light Rail</option>
+                <option value="monorail">Monorail</option>
+                <option value="ferry">Ferry</option>
+            </select>
+            <button onclick="fetchRoutes()" style="margin-top: 10px; padding: 8px 16px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer;">Fetch Routes</button>
+        </div>
+        <div class="controls-divider"></div>
+        <button onclick="clearOSM()" style="margin-top: 10px; padding: 8px 16px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">Clear</button>
+        <button onclick="hideStops()" style="margin-top: 10px; margin-left: 10px; padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">Back</button>
+        <div id="osm-results" style="margin-top: 20px;"></div>
+        <input type="text" id="route-search" placeholder="Search routes..." list="route-options" oninput="filterRoutes(this.value)">
+        <datalist id="route-options"></datalist>
+        <div id="routes-list" style="margin-top: 20px;"></div>
+            <datalist id="transport-options"></datalist>
+        <div id="transport-controls" style="display: none;">
+            <label for="transport-per-page">Show </label>
+            <select id="transport-per-page" onchange="changeTransportPerPage()">
+                <option value="10">10</option>
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="200">200</option>
+                <option value="500">500</option>
+                <option value="all">All</option>
+            </select>
+            <label> entries</label>
+            <div id="transport-pagination" style="margin-top: 10px;"></div>
+        </div>
+        <table id="transport-table" style="margin-top: 20px; width: 100%; border-collapse: collapse; display: none;">
+            <thead>
+                <tr>
+                    <th style="border: 1px solid #ddd; padding: 8px;">Name</th>
+                    <th style="border: 1px solid #ddd; padding: 8px;">Ref</th>
+                    <th style="border: 1px solid #ddd; padding: 8px;">Order</th>
+                </tr>
+            </thead>
+            <tbody id="transport-tbody"></tbody>
+        </table>
+        <div id="transport-details" style="display: none; margin-top: 20px; border: 1px solid #ddd; padding: 10px; white-space: pre-wrap; max-width: 100%;"></div>
+    </div>
+
+    <script src="osm.functions.js"></script>
+    <script>
+        // Initialize OSM viewer
+    </script>
+</body>
+</html>
