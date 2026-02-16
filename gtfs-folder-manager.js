@@ -7,7 +7,8 @@ window.currentGtfsFolder = 'gtfs_amb_bus';
 // List of available GTFS folders (add your folders here)
 const GTFS_FOLDERS = [
     'gtfs_amb_bus',
-'gtfs_cat_bus',	// Barcelona bus data
+'gtfs_cat_interurba_bus',	// Barcelona bus data
+'gtfs_cat_urba_bus',	// Barcelona bus data
     'gtfs_zaragoza',     // Zaragoza transport data
     // Add more folders like this:
     // 'gtfs_madrid',

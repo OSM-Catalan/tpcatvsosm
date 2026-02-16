@@ -55,6 +55,8 @@ function initializeGtfsFolderDropdown() {
     option4.value = "gtfs_zaragoza";
     option4.textContent = "ZARAGOZA";
     dropdown.appendChild(option4);
+	
+	
 
     // Set default folder
     // window.currentGtfsFolder = "gtfs_amb_bus";
